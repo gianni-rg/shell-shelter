@@ -1,0 +1,42 @@
+# Enforce LF line endings for text files across platforms
+* text=auto eol=lf
+
+# Common text types (explicit for clarity)
+*.cs text eol=lf
+*.csproj text eol=lf
+*.sln text eol=lf
+*.props text eol=lf
+*.targets text eol=lf
+*.dcproj text eol=lf
+*.json text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.md text eol=lf
+*.txt text eol=lf
+*.xml text eol=lf
+*.editorconfig text eol=lf
+Dockerfile text eol=lf
+*.dockerfile text eol=lf
+
+# Shell scripts should be LF
+*.sh text eol=lf
+
+# Windows-specific scripts may keep CRLF
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Treat these as binary to avoid EOL normalization
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.gz  binary
+*.bz2 binary
+*.xz  binary
+*.7z  binary
+*.dll binary
+*.exe binary

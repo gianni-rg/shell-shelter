@@ -419,3 +419,16 @@ FodyWeavers.xsd
 
 # OpenSpec generated files
 openspec/
+
+# Temporary files from development and testing
+tmp/
+
+# Agents
+.github/agents/
+.github/hooks/
+.github/instructions/
+.github/prompts/
+.github/skills/
+.github/copilot-instructions.md
+.github/README.md
+.github/USER-GUIDE.md

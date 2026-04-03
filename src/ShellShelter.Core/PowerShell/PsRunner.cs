@@ -128,6 +128,8 @@ public static class PsRunner
     /// </summary>
     private static void EnsurePwsh(string pwshPath)
     {
+        ToolAvailabilityBootstrap.EnsurePwshAvailable(pwshPath);
+
         try
         {
             var psi = new ProcessStartInfo
@@ -160,7 +162,7 @@ public static class PsRunner
         }
         catch (Exception ex)
         {
-            throw new PwshNotFoundException(pwshPath, innerException: ex);
+            throw new PwshNotFoundException(pwshPath, hint: null, innerException: ex);
         }
     }
 }

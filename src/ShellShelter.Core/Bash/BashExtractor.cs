@@ -67,11 +67,7 @@ public sealed class BashExtractor : IShellExtractor
         if (string.IsNullOrEmpty(cmd))
             throw new ArgumentNullException(nameof(cmd));
 
-        // Check if shfmt exists in PATH
-        if (!IsShfmtAvailable(shfmtPath))
-            throw new FileNotFoundException(
-                $"{shfmtPath} not found in PATH. Install shfmt to use BashExtractor. " +
-                "On macOS: brew install shfmt, on Linux: apt-get install shfmt");
+        ToolAvailabilityBootstrap.EnsureShfmtAvailable(shfmtPath);
 
         using var process = new Process
         {
@@ -543,35 +539,6 @@ public sealed class BashExtractor : IShellExtractor
     Task<ExtractionResult> IShellExtractor.ExtractAsync(string cmd) =>
         ExtractAsync(cmd);
 
-    /// <summary>
-    /// Checks if shfmt is available in the system PATH.
-    /// </summary>
-    private static bool IsShfmtAvailable(string shfmtPath)
-    {
-        try
-        {
-            var processInfo = new ProcessStartInfo
-            {
-                FileName = shfmtPath,
-                Arguments = "--version",
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                CreateNoWindow = true
-            };
-
-            using var process = Process.Start(processInfo);
-            if (process is null)
-                return false;
-
-            process.WaitForExit(1000); // Wait up to 1 second
-            return process.ExitCode == 0;
-        }
-        catch
-        {
-            return false;
-        }
-    }
 }
 
 /// <summary>

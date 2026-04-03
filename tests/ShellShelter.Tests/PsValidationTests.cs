@@ -107,6 +107,24 @@ public sealed class PsValidationTests
                 PsPolicy()));
     }
 
+    [Fact]
+    public async Task ValidateAsync_DestinationFlagAllowed_DoesNotThrow()
+    {
+        await Should.NotThrowAsync(
+            async () => await PsShell.ValidateAsync(
+                "Get-Process | Tee-Object -FilePath ./out.txt",
+                PsPolicy()));
+    }
+
+    [Fact]
+    public async Task ValidateAsync_DestinationFlagDisallowed_ThrowsDisallowedDestException()
+    {
+        await Should.ThrowAsync<DisallowedDestException>(
+            async () => await PsShell.ValidateAsync(
+                "Get-Process | Tee-Object -FilePath /etc/passwd",
+                PsPolicy()));
+    }
+
     // ---------------------------------------------------------------------------
     // ShellPolicy.WithRemove / WithAdd string overloads
     // ---------------------------------------------------------------------------

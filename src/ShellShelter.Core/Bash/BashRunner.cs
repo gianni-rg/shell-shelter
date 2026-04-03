@@ -28,7 +28,7 @@ public static class BashRunner
     {
         ArgumentNullException.ThrowIfNull(cmd);
 
-        var (exitCode, output) = RunInternal(cmd, bashPath, throwOnError: true);
+        var (_, output) = RunInternal(cmd, bashPath, throwOnError: true);
         return output;
     }
 
@@ -43,7 +43,7 @@ public static class BashRunner
     {
         ArgumentNullException.ThrowIfNull(cmd);
 
-        var (exitCode, output) = await RunInternalAsync(cmd, bashPath, throwOnError: true);
+        var (_, output) = await RunInternalAsync(cmd, bashPath, throwOnError: true);
         return output;
     }
 

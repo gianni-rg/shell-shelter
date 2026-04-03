@@ -215,7 +215,7 @@ public static class DefaultConfigs
         "env:exec=$0",
         "xargs:exec=$0",
         "tee:dest=$0",
-        "ex:dest=$0",
+        "ex:dest=$2",
         "cp:dest=$-1",
         "mv:dest=$-1",
         "mkdir:dest=$-1",
@@ -309,7 +309,7 @@ public static class DefaultConfigs
             folder2ctx, repo2ctx
             # Positional exec/dest handling
             env:exec=$0, xargs:exec=$0
-            tee:dest=$0, ex:dest=$0, cp:dest=$-1, mv:dest=$-1, mkdir:dest=$-1
+            tee:dest=$0, ex:dest=$2, cp:dest=$-1, mv:dest=$-1, mkdir:dest=$-1
             # Exec/dest flag handling
             find:-delete|-ok|-okdir:exec=-exec|-execdir
             rg:--pre

@@ -151,8 +151,18 @@ public static class PsAliasResolver
     /// <returns>
     /// The canonical cmdlet name if the token is a known alias; otherwise the original token.
     /// </returns>
-    public static string Resolve(string token) =>
-        Aliases.TryGetValue(token, out string? canonical) ? canonical : token;
+    public static string Resolve(string token)
+    {
+        ArgumentNullException.ThrowIfNull(token);
+
+        string current = token;
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        while (Aliases.TryGetValue(current, out string? next) && seen.Add(current))
+            current = next;
+
+        return current;
+    }
 
     /// <summary>
     /// Returns whether the given token is a known PowerShell built-in alias.

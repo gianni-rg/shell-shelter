@@ -144,6 +144,8 @@ public static class BashShell
         IReadOnlyDictionary<string, IReadOnlySet<int>>? execPos = null,
         IReadOnlyDictionary<string, IReadOnlySet<int>>? destPos = null)
     {
-        return SafeRunAsync(cmd, policy, bashPath, execFlags, destFlags, execPos, destPos).Result;
+        return SafeRunAsync(cmd, policy, bashPath, execFlags, destFlags, execPos, destPos)
+            .GetAwaiter()
+            .GetResult();
     }
 }

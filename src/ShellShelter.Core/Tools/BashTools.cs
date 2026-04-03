@@ -145,6 +145,13 @@ public static class BashTools
     {
         ArgumentException.ThrowIfNullOrEmpty(path);
 
+        ShellPolicy policy = LoadBashPolicy();
+        if (!ShellValidator.ValidateDestination(path, policy.OkDests))
+        {
+            var denyEx = new DisallowedDestException(path);
+            return ToolResult.Denied(denyEx.Message, policy.OkCmds, policy.OkDests);
+        }
+
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path)) ?? ".");
 
         string trimmedCmds = cmds.Trim();
@@ -163,8 +170,6 @@ public static class BashTools
             {trimmedCmds}x
             EX_EOF
             """;
-
-        ShellPolicy policy = LoadBashPolicy();
 
         try
         {
@@ -259,10 +264,7 @@ public static class BashTools
         // Validate the destination before building the command when inplace
         if (inplace)
         {
-            string normalizedPath = ShellValidator.NormalizeDestination(path);
-            bool destAllowed = policy.OkDests.Any(d =>
-                normalizedPath.StartsWith(ShellValidator.NormalizeDestination(d),
-                    StringComparison.OrdinalIgnoreCase));
+            bool destAllowed = ShellValidator.ValidateDestination(path, policy.OkDests);
             if (!destAllowed)
             {
                 var denyEx = new DisallowedDestException(path);
@@ -305,11 +307,11 @@ public static class BashTools
         }
         catch (DisallowedCmdException ex)
         {
-            return ToolResult.Denied(ex.Message, policy.OkCmds, policy.OkDests);
+            return ToolResult.Denied(ex.Message, sedPolicy.OkCmds, sedPolicy.OkDests);
         }
         catch (DisallowedDestException ex)
         {
-            return ToolResult.Denied(ex.Message, policy.OkCmds, policy.OkDests);
+            return ToolResult.Denied(ex.Message, sedPolicy.OkCmds, sedPolicy.OkDests);
         }
         catch (Exception ex)
         {

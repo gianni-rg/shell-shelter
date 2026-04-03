@@ -168,10 +168,7 @@ public static class PsTools
         ShellPolicy policy = LoadPsPolicy();
 
         // Validate destination before running
-        string normalizedPath = ShellValidator.NormalizeDestination(path);
-        bool destAllowed = policy.OkDests.Any(d =>
-            normalizedPath.StartsWith(ShellValidator.NormalizeDestination(d),
-                StringComparison.OrdinalIgnoreCase));
+        bool destAllowed = ShellValidator.ValidateDestination(path, policy.OkDests);
 
         if (!destAllowed)
         {
@@ -193,11 +190,11 @@ public static class PsTools
         }
         catch (DisallowedCmdException ex)
         {
-            return ToolResult.Denied(ex.Message, policy.OkCmds, policy.OkDests);
+            return ToolResult.Denied(ex.Message, writePolicy.OkCmds, writePolicy.OkDests);
         }
         catch (DisallowedDestException ex)
         {
-            return ToolResult.Denied(ex.Message, policy.OkCmds, policy.OkDests);
+            return ToolResult.Denied(ex.Message, writePolicy.OkCmds, writePolicy.OkDests);
         }
         catch (Exception ex)
         {

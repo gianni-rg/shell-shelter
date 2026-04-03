@@ -165,6 +165,12 @@ public sealed class PsExtractorTests
     }
 
     [Fact]
+    public void PsAliasResolver_TransitiveAlias_ResolvesToCanonical()
+    {
+        PsAliasResolver.Resolve("man").ShouldBe("Get-Help");
+    }
+
+    [Fact]
     public void PsAliasResolver_IsAlias_ReturnsTrueForKnownAlias()
     {
         PsAliasResolver.IsAlias("ls").ShouldBeTrue();

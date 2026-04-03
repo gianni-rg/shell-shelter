@@ -74,16 +74,31 @@ public static class ShellValidator
         IReadOnlySet<CmdSpec> allowedCommands,
         IReadOnlySet<string> allowedDestinations)
     {
-        // Find the matching CmdSpec for this command
-        var matchingSpec = allowedCommands.FirstOrDefault(spec => spec.IsAllowed(tokens));
-        if (matchingSpec is null)
+        // Use the most specific matching specs (longest command prefix) for deterministic validation.
+        var matchingSpecs = allowedCommands.Where(spec => spec.IsAllowed(tokens)).ToList();
+        if (matchingSpecs.Count == 0)
             return; // Command validation has already failed elsewhere
 
-        // Get the arguments (skip the command name prefix)
-        var args = tokens.Skip(matchingSpec.Name.Count).ToList();
+        int maxPrefixLength = matchingSpecs.Max(spec => spec.Name.Count);
+        var relevantSpecs = matchingSpecs.Where(spec => spec.Name.Count == maxPrefixLength).ToList();
 
-        // Validate positional destination arguments
-        foreach (int pos in matchingSpec.DestPos)
+        // Get the arguments (skip the command name prefix)
+        var args = tokens.Skip(maxPrefixLength).ToList();
+
+        foreach (CmdSpec spec in relevantSpecs)
+        {
+            ValidatePositionalDestinations(spec, args, tokens, allowedDestinations);
+            ValidateFlagDestinations(spec, args, tokens, allowedDestinations);
+        }
+    }
+
+    private static void ValidatePositionalDestinations(
+        CmdSpec spec,
+        IReadOnlyList<string> args,
+        IReadOnlyList<string> tokens,
+        IReadOnlySet<string> allowedDestinations)
+    {
+        foreach (int pos in spec.DestPos)
         {
             int actualIdx = pos < 0 ? args.Count + pos : pos;
             if (actualIdx < 0 || actualIdx >= args.Count)
@@ -97,6 +112,65 @@ public static class ShellValidator
             if (!ValidateDestination(dest, allowedDestinations))
                 throw new DisallowedDestException(dest);
         }
+    }
+
+    private static void ValidateFlagDestinations(
+        CmdSpec spec,
+        IReadOnlyList<string> args,
+        IReadOnlyList<string> tokens,
+        IReadOnlySet<string> allowedDestinations)
+    {
+        foreach (string flag in spec.DestFlags)
+        {
+            for (int idx = 0; idx < args.Count; idx++)
+            {
+                if (!TryGetDestinationForFlag(flag, args, idx, tokens, out string? destination))
+                    continue;
+
+                if (!ValidateDestination(destination, allowedDestinations))
+                    throw new DisallowedDestException(destination);
+            }
+        }
+    }
+
+    private static bool TryGetDestinationForFlag(
+        string flag,
+        IReadOnlyList<string> args,
+        int idx,
+        IReadOnlyList<string> tokens,
+        out string? destination)
+    {
+        destination = null;
+        string arg = args[idx];
+
+        if (string.Equals(arg, flag, StringComparison.Ordinal))
+        {
+            int destIdx = idx + 1;
+            if (destIdx >= args.Count)
+            {
+                throw new DisallowedDestException(
+                    string.Join(" ", tokens),
+                    $"Missing destination argument after flag {flag} for command: {string.Join(" ", tokens)}");
+            }
+
+            destination = args[destIdx];
+            return true;
+        }
+
+        string prefix = flag + "=";
+        if (!arg.StartsWith(prefix, StringComparison.Ordinal))
+            return false;
+
+        string destValue = arg[prefix.Length..];
+        if (string.IsNullOrWhiteSpace(destValue))
+        {
+            throw new DisallowedDestException(
+                string.Join(" ", tokens),
+                $"Missing destination value for flag {flag} in command: {string.Join(" ", tokens)}");
+        }
+
+        destination = destValue;
+        return true;
     }
 
     /// <summary>
@@ -118,11 +192,30 @@ public static class ShellValidator
         foreach (string pattern in allowedPatterns)
         {
             string normalizedPattern = NormalizeDestination(pattern);
-            if (normalizedDest.StartsWith(normalizedPattern, comparison))
+            if (MatchesAllowedDestinationPrefix(normalizedDest, normalizedPattern, comparison))
                 return true;
         }
 
         return false;
+    }
+
+    private static bool MatchesAllowedDestinationPrefix(string destination, string allowedPrefix, StringComparison comparison)
+    {
+        if (string.Equals(destination, allowedPrefix, comparison))
+            return true;
+
+        if (!destination.StartsWith(allowedPrefix, comparison))
+            return false;
+
+        if (allowedPrefix.EndsWith(Path.DirectorySeparatorChar)
+            || allowedPrefix.EndsWith(Path.AltDirectorySeparatorChar))
+            return true;
+
+        if (destination.Length <= allowedPrefix.Length)
+            return false;
+
+        char nextChar = destination[allowedPrefix.Length];
+        return nextChar == Path.DirectorySeparatorChar || nextChar == Path.AltDirectorySeparatorChar;
     }
 
     /// <summary>
@@ -143,7 +236,7 @@ public static class ShellValidator
         ArgumentNullException.ThrowIfNull(destination);
 
         // Expand ~ to home directory
-        if (destination.StartsWith("~"))
+        if (destination.StartsWith('~'))
         {
             string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
             if (destination == "~")

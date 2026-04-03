@@ -111,6 +111,16 @@ public sealed class ValidationTests
     }
 
     [Fact]
+    public void ValidateDestination_PrefixWithoutBoundary_ReturnsFalse()
+    {
+        var allowedDests = new HashSet<string> { "/tmp" };
+
+        bool result = ShellValidator.ValidateDestination("/tmpfile", allowedDests);
+
+        result.ShouldBeFalse();
+    }
+
+    [Fact]
     public void NormalizeDestination_TildePath_ExpandsToHome()
     {
         string input = "~/test.txt";
@@ -187,6 +197,40 @@ public sealed class ValidationTests
             new[] { new[] { "echo", "hello" }.AsReadOnly() }.AsReadOnly(),
             new HashSet<string> { ">" },
             new List<(string, string)> { (">", "/etc/passwd") });
+
+        Should.Throw<DisallowedDestException>(() => ShellValidator.Validate(extraction, policy));
+    }
+
+    [Fact]
+    public void Validate_DestinationFlag_DisallowedPath_ThrowsDisallowedDestException()
+    {
+        var policy = new ShellPolicy(
+            okCmds: [new CmdSpec("curl", destFlags: ["-o", "--output"])],
+            okDests: ["./", "/tmp"]);
+
+        var extraction = new ExtractionResult(
+            new[] { new[] { "curl", "-o", "/etc/passwd", "https://example.com" }.AsReadOnly() }.AsReadOnly(),
+            new HashSet<string>(),
+            new List<(string, string)>());
+
+        Should.Throw<DisallowedDestException>(() => ShellValidator.Validate(extraction, policy));
+    }
+
+    [Fact]
+    public void Validate_MostSpecificMatchingSpec_IsUsedForDestinationValidation()
+    {
+        var policy = new ShellPolicy(
+            okCmds:
+            [
+                new CmdSpec("git"),
+                new CmdSpec("git clone", destPos: [0]),
+            ],
+            okDests: ["./", "/tmp"]);
+
+        var extraction = new ExtractionResult(
+            new[] { new[] { "git", "clone", "/etc/passwd" }.AsReadOnly() }.AsReadOnly(),
+            new HashSet<string>(),
+            new List<(string, string)>());
 
         Should.Throw<DisallowedDestException>(() => ShellValidator.Validate(extraction, policy));
     }

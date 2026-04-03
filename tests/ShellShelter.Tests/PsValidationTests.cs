@@ -125,6 +125,24 @@ public sealed class PsValidationTests
                 PsPolicy()));
     }
 
+    [Fact]
+    public async Task ValidateAsync_DestinationFlagColonAssignmentCaseInsensitive_Allowed_DoesNotThrow()
+    {
+        await Should.NotThrowAsync(
+            async () => await PsShell.ValidateAsync(
+                "Get-Process | Tee-Object -filepath:./out.txt",
+                PsPolicy()));
+    }
+
+    [Fact]
+    public async Task ValidateAsync_DestinationFlagColonAssignmentCaseInsensitive_Disallowed_ThrowsDisallowedDestException()
+    {
+        await Should.ThrowAsync<DisallowedDestException>(
+            async () => await PsShell.ValidateAsync(
+                "Get-Process | Tee-Object -filepath:/etc/passwd",
+                PsPolicy()));
+    }
+
     // ---------------------------------------------------------------------------
     // ShellPolicy.WithRemove / WithAdd string overloads
     // ---------------------------------------------------------------------------

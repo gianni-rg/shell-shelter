@@ -27,7 +27,7 @@ Both map to `ShellPolicy` objects through `ConfigLoader`.
 - `[DEFAULT]` for Bash policy
 - `[POWERSHELL]` for PowerShell policy
 
-If `[POWERSHELL]` is omitted, PowerShell falls back to built-in defaults.
+If `[POWERSHELL]` is omitted, PowerShell policy is empty (all commands denied unless explicitly configured).
 
 ### Minimal Example
 

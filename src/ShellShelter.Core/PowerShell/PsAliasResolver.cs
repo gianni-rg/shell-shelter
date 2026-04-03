@@ -49,7 +49,8 @@ public static class PsAliasResolver
         { "rd",       RemoveItem },
         { "ri",       RemoveItem },
         { "rmdir",    RemoveItem },
-        { "md",       "mkdir" },
+        { "md",       "New-Item" },
+        { "mkdir",    "New-Item" },
         { "ni",       "New-Item" },
 
         // Process
@@ -76,7 +77,7 @@ public static class PsAliasResolver
         // Commands / help
         { "gcm",      "Get-Command" },
         { "help",     "Get-Help" },
-        { "man",      "help" },
+        { "man",      "Get-Help" },
 
         // Measure / format
         { "measure",  "Measure-Object" },

@@ -33,7 +33,7 @@ public sealed class PsExtractor : IShellExtractor
 
         ScriptBlockAst ast = Parser.ParseInput(cmd, out _, out ParseError[] errors);
 
-        // Surface parse errors — not necessarily fatal; partial ASTs are still useful
+        // Surface parse errors as fatal to avoid validating/executing partially parsed input.
         if (errors.Length > 0)
         {
             string errorMessages = string.Join("; ", errors.Select(e => e.Message));

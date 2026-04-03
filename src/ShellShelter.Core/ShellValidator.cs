@@ -3,10 +3,10 @@ using System.Text.RegularExpressions;
 namespace ShellShelter.Core;
 
 /// <summary>
-/// Validates bash commands against shell policies using extracted command data.
+/// Validates extracted shell commands against shell policies.
 /// </summary>
 /// <remarks>
-/// This validator takes ExtractionResult (from BashExtractor) and a ShellPolicy,
+/// This validator takes an <see cref="ExtractionResult"/> and a <see cref="ShellPolicy"/>,
 /// and validates that all commands and redirect destinations are allowed.
 /// </remarks>
 public static class ShellValidator
@@ -14,11 +14,22 @@ public static class ShellValidator
     /// <summary>
     /// Validates that all commands in the extraction result are allowed.
     /// </summary>
-    /// <param name="result">The extraction result from BashExtractor.</param>
+    /// <param name="result">The extraction result from a shell extractor.</param>
     /// <param name="policy">The shell policy containing allowed commands and destinations.</param>
+    /// <param name="destinationFlagNamesCaseInsensitive">
+    /// When true, destination flag names are matched case-insensitively.
+    /// </param>
+    /// <param name="allowPowerShellFlagColonAssignment">
+    /// When true, destination flag assignment using <c>-Flag:Value</c> is accepted in addition
+    /// to <c>-Flag Value</c> and <c>-Flag=Value</c>.
+    /// </param>
     /// <exception cref="DisallowedCmdException">Thrown when a command is not allowed.</exception>
     /// <exception cref="DisallowedDestException">Thrown when a redirect destination is not allowed.</exception>
-    public static void Validate(ExtractionResult result, ShellPolicy policy)
+    public static void Validate(
+        ExtractionResult result,
+        ShellPolicy policy,
+        bool destinationFlagNamesCaseInsensitive = false,
+        bool allowPowerShellFlagColonAssignment = false)
     {
         ArgumentNullException.ThrowIfNull(result);
         ArgumentNullException.ThrowIfNull(policy);
@@ -32,7 +43,12 @@ public static class ShellValidator
         // Validate destination arguments in each command
         foreach (var commandTokens in result.Commands)
         {
-            ValidateDestinationArgs(commandTokens, policy.OkCmds, policy.OkDests);
+            ValidateDestinationArgs(
+                commandTokens,
+                policy.OkCmds,
+                policy.OkDests,
+                destinationFlagNamesCaseInsensitive,
+                allowPowerShellFlagColonAssignment);
         }
 
         // Validate redirect destinations
@@ -72,7 +88,9 @@ public static class ShellValidator
     private static void ValidateDestinationArgs(
         IReadOnlyList<string> tokens,
         IReadOnlySet<CmdSpec> allowedCommands,
-        IReadOnlySet<string> allowedDestinations)
+        IReadOnlySet<string> allowedDestinations,
+        bool destinationFlagNamesCaseInsensitive,
+        bool allowPowerShellFlagColonAssignment)
     {
         // Use the most specific matching specs (longest command prefix) for deterministic validation.
         var matchingSpecs = allowedCommands.Where(spec => spec.IsAllowed(tokens)).ToList();
@@ -88,7 +106,13 @@ public static class ShellValidator
         foreach (CmdSpec spec in relevantSpecs)
         {
             ValidatePositionalDestinations(spec, args, tokens, allowedDestinations);
-            ValidateFlagDestinations(spec, args, tokens, allowedDestinations);
+            ValidateFlagDestinations(
+                spec,
+                args,
+                tokens,
+                allowedDestinations,
+                destinationFlagNamesCaseInsensitive,
+                allowPowerShellFlagColonAssignment);
         }
     }
 
@@ -118,13 +142,26 @@ public static class ShellValidator
         CmdSpec spec,
         IReadOnlyList<string> args,
         IReadOnlyList<string> tokens,
-        IReadOnlySet<string> allowedDestinations)
+        IReadOnlySet<string> allowedDestinations,
+        bool destinationFlagNamesCaseInsensitive,
+        bool allowPowerShellFlagColonAssignment)
     {
+        StringComparison flagComparison = destinationFlagNamesCaseInsensitive
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
+
         foreach (string flag in spec.DestFlags)
         {
             for (int idx = 0; idx < args.Count; idx++)
             {
-                if (!TryGetDestinationForFlag(flag, args, idx, tokens, out string destination))
+                if (!TryGetDestinationForFlag(
+                        flag,
+                        args,
+                        idx,
+                        tokens,
+                        flagComparison,
+                        allowPowerShellFlagColonAssignment,
+                        out string destination))
                     continue;
 
                 if (!ValidateDestination(destination, allowedDestinations))
@@ -138,12 +175,14 @@ public static class ShellValidator
         IReadOnlyList<string> args,
         int idx,
         IReadOnlyList<string> tokens,
+        StringComparison flagComparison,
+        bool allowPowerShellFlagColonAssignment,
         out string destination)
     {
         destination = string.Empty;
         string arg = args[idx];
 
-        if (string.Equals(arg, flag, StringComparison.Ordinal))
+        if (string.Equals(arg, flag, flagComparison))
         {
             int destIdx = idx + 1;
             if (destIdx >= args.Count)
@@ -158,19 +197,39 @@ public static class ShellValidator
         }
 
         string prefix = flag + "=";
-        if (!arg.StartsWith(prefix, StringComparison.Ordinal))
-            return false;
-
-        string destValue = arg[prefix.Length..];
-        if (string.IsNullOrWhiteSpace(destValue))
+        if (arg.StartsWith(prefix, flagComparison))
         {
-            throw new DisallowedDestException(
-                string.Join(" ", tokens),
-                $"Missing destination value for flag {flag} in command: {string.Join(" ", tokens)}");
+            string equalsValue = arg[prefix.Length..];
+            if (string.IsNullOrWhiteSpace(equalsValue))
+            {
+                throw new DisallowedDestException(
+                    string.Join(" ", tokens),
+                    $"Missing destination value for flag {flag} in command: {string.Join(" ", tokens)}");
+            }
+
+            destination = equalsValue;
+            return true;
         }
 
-        destination = destValue;
-        return true;
+        if (allowPowerShellFlagColonAssignment)
+        {
+            string colonPrefix = flag + ":";
+            if (arg.StartsWith(colonPrefix, flagComparison))
+            {
+                string colonValue = arg[colonPrefix.Length..];
+                if (string.IsNullOrWhiteSpace(colonValue))
+                {
+                    throw new DisallowedDestException(
+                        string.Join(" ", tokens),
+                        $"Missing destination value for flag {flag} in command: {string.Join(" ", tokens)}");
+                }
+
+                destination = colonValue;
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /// <summary>

@@ -1,7 +1,7 @@
 namespace ShellShelter.Core;
 
 /// <summary>
-/// Represents the result of extracting commands from a bash command string.
+/// Represents the result of extracting commands from a shell command string.
 /// </summary>
 /// <remarks>
 /// Contains the list of all executable commands, a set of operators used,

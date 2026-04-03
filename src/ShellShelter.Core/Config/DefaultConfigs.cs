@@ -391,7 +391,7 @@ public static class DefaultConfigs
         "dotnet build", "dotnet test", "dotnet restore", "dotnet list package",
         "dotnet list reference", "dotnet format --verify-no-changes",
         // Tee (write dest validated)
-        "Tee-Object",
+        "Tee-Object:dest=-FilePath|-LiteralPath",
     ];
 
     /// <summary>
@@ -424,6 +424,6 @@ public static class DefaultConfigs
             gh auth status, gh gist list, gh gist view, gh browse, gh search
             dotnet build, dotnet test, dotnet restore, dotnet list package,
             dotnet list reference, dotnet format --verify-no-changes
-            Tee-Object
+            Tee-Object:dest=-FilePath|-LiteralPath
         """;
 }

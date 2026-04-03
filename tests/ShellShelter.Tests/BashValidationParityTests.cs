@@ -190,5 +190,8 @@ public sealed class BashValidationParityTests
 
         pair.PsPolicy.OkCmds.Count.ShouldBeGreaterThan(0);
         pair.PsPolicy.OkDests.Count.ShouldBeGreaterThan(0);
+        pair.PsPolicy.OkCmds.ShouldContain(
+            spec => spec.Equals(new CmdSpec("Tee-Object"))
+                && spec.DestFlags.SetEquals(new[] { "-FilePath", "-LiteralPath" }));
     }
 }

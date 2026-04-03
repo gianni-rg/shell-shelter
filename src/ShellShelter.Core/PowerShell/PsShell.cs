@@ -24,7 +24,11 @@ public static class PsShell
         ArgumentNullException.ThrowIfNull(policy);
 
         ExtractionResult result = await _extractor.ExtractAsync(cmd);
-        ShellValidator.Validate(result, policy);
+        ShellValidator.Validate(
+            result,
+            policy,
+            destinationFlagNamesCaseInsensitive: true,
+            allowPowerShellFlagColonAssignment: true);
     }
 
     /// <summary>

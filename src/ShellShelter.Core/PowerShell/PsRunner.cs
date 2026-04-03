@@ -6,7 +6,7 @@ namespace ShellShelter.Core.PowerShell;
 /// Executes validated PowerShell commands using an out-of-process <c>pwsh</c> invocation.
 /// </summary>
 /// <remarks>
-/// All commands are executed via <c>pwsh -NonInteractive -Command &lt;cmd&gt;</c>. The command string
+/// All commands are executed via <c>pwsh -NoProfile -NonInteractive -Command &lt;cmd&gt;</c>. The command string
 /// is passed as a separate argument, never interpolated into a shell string, to prevent injection.
 /// If the legacy Windows PowerShell (<c>powershell.exe</c>, v5) is detected instead of PowerShell
 /// Core (&gt;= 7), a <see cref="PwshNotFoundException"/> is thrown with an upgrade hint.
@@ -28,7 +28,7 @@ public static class PsRunner
         ArgumentNullException.ThrowIfNull(cmd);
 
         EnsurePwsh(pwshPath);
-        var (exitCode, output) = await RunInternalAsync(cmd, pwshPath, throwOnError: true);
+        var (_, output) = await RunInternalAsync(cmd, pwshPath, throwOnError: true);
         return output;
     }
 
@@ -104,6 +104,11 @@ public static class PsRunner
 
     private static Process CreateProcess(string cmd, string pwshPath)
     {
+        return new Process { StartInfo = CreateCommandStartInfo(cmd, pwshPath) };
+    }
+
+    internal static ProcessStartInfo CreateCommandStartInfo(string cmd, string pwshPath)
+    {
         var psi = new ProcessStartInfo
         {
             FileName = pwshPath,
@@ -113,13 +118,17 @@ public static class PsRunner
             CreateNoWindow = true
         };
 
-        // Pass -NonInteractive and -Command separately to avoid shell string interpolation.
-        // The command is the final argument — pwsh treats everything after -Command as the script.
+        // Disable profile loading and pass arguments separately to avoid command-line interpolation.
+        psi.ArgumentList.Add("-NoProfile");
         psi.ArgumentList.Add("-NonInteractive");
         psi.ArgumentList.Add("-Command");
         psi.ArgumentList.Add(cmd);
+        return psi;
+    }
 
-        return new Process { StartInfo = psi };
+    internal static ProcessStartInfo CreateVersionProbeStartInfo(string pwshPath)
+    {
+        return CreateCommandStartInfo("$PSVersionTable.PSVersion.Major", pwshPath);
     }
 
     /// <summary>
@@ -132,17 +141,7 @@ public static class PsRunner
 
         try
         {
-            var psi = new ProcessStartInfo
-            {
-                FileName = pwshPath,
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                CreateNoWindow = true
-            };
-            psi.ArgumentList.Add("-NonInteractive");
-            psi.ArgumentList.Add("-Command");
-            psi.ArgumentList.Add("$PSVersionTable.PSVersion.Major");
+            ProcessStartInfo psi = CreateVersionProbeStartInfo(pwshPath);
 
             using var process = Process.Start(psi)
                 ?? throw new PwshNotFoundException(pwshPath);

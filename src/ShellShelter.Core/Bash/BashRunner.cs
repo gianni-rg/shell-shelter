@@ -189,20 +189,27 @@ public static class BashRunner
 
     private static Process CreateBashCommandProcess(string cmd, string bashPath)
     {
-        var process = new Process
+        var process = new Process { StartInfo = CreateBashCommandStartInfo(cmd, bashPath) };
+        return process;
+    }
+
+    internal static ProcessStartInfo CreateBashCommandStartInfo(string cmd, string bashPath)
+    {
+        var psi = new ProcessStartInfo
         {
-            StartInfo = new ProcessStartInfo
-            {
-                FileName = bashPath,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            }
+            FileName = bashPath,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
         };
 
-        process.StartInfo.ArgumentList.Add("-c");
-        process.StartInfo.ArgumentList.Add(cmd);
-        return process;
+        // Prevent startup-file injection in non-interactive shells.
+        psi.Environment["BASH_ENV"] = string.Empty;
+        psi.Environment["ENV"] = string.Empty;
+
+        psi.ArgumentList.Add("-c");
+        psi.ArgumentList.Add(cmd);
+        return psi;
     }
 }

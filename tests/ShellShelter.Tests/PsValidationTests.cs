@@ -1,6 +1,5 @@
 using Shouldly;
 using ShellShelter.Core;
-using ShellShelter.Core.Bash;
 using ShellShelter.Core.PowerShell;
 
 namespace ShellShelter.Tests;

@@ -158,9 +158,9 @@ public static class PsTools
         ShellPolicy policy = LoadPsPolicy();
 
         // Validate destination before running
-        string normalizedPath = Bash.ShellValidator.NormalizeDestination(path);
+        string normalizedPath = ShellValidator.NormalizeDestination(path);
         bool destAllowed = policy.OkDests.Any(d =>
-            normalizedPath.StartsWith(Bash.ShellValidator.NormalizeDestination(d),
+            normalizedPath.StartsWith(ShellValidator.NormalizeDestination(d),
                 StringComparison.OrdinalIgnoreCase));
 
         if (!destAllowed)

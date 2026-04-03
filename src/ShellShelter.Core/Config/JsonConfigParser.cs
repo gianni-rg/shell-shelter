@@ -1,5 +1,4 @@
 using System.Text.Json;
-using ShellShelter.Core;
 
 namespace ShellShelter.Core.Config;
 

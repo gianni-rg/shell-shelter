@@ -1,5 +1,3 @@
-using ShellShelter.Core;
-
 namespace ShellShelter.Core.Config;
 
 /// <summary>

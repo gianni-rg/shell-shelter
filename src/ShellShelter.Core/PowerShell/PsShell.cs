@@ -1,5 +1,3 @@
-using ShellShelter.Core.PowerShell;
-
 namespace ShellShelter.Core.PowerShell;
 
 /// <summary>
@@ -26,7 +24,7 @@ public static class PsShell
         ArgumentNullException.ThrowIfNull(policy);
 
         ExtractionResult result = await _extractor.ExtractAsync(cmd);
-        Bash.ShellValidator.Validate(result, policy);
+        ShellValidator.Validate(result, policy);
     }
 
     /// <summary>

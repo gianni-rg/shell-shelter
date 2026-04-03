@@ -1,8 +1,6 @@
 using System.Text.RegularExpressions;
 
-namespace ShellShelter.Core.Bash;
-
-using ShellShelter.Core;
+namespace ShellShelter.Core;
 
 /// <summary>
 /// Validates bash commands against shell policies using extracted command data.

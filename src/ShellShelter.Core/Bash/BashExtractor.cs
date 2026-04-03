@@ -27,9 +27,25 @@ public sealed class BashExtractor : IShellExtractor
     /// <summary>
     /// Operator codes used by shfmt and their string representations.
     /// </summary>
-    private static readonly Dictionary<int, string> OpMap = new()
+    private static readonly Dictionary<int, string> OpMapLegacy = new()
     {
-        // shfmt v3.13+ op codes
+        // shfmt legacy op codes
+        { 10, "&&" },
+        { 11, "||" },
+        { 12, "|" },
+        { 13, "|&" },
+        { 54, ">" },
+        { 55, ">>" },
+        { 56, "<" },
+        { 58, "<&" },
+        { 59, ">&" },
+        { 64, "&>" },
+        { 65, "&>>" }
+    };
+
+    private static readonly Dictionary<int, string> OpMapNew = new()
+    {
+        // shfmt newer op codes
         { 11, "&&" },
         { 12, "||" },
         { 13, "|" },
@@ -46,7 +62,15 @@ public sealed class BashExtractor : IShellExtractor
     /// <summary>
     /// Write redirect operator codes (subset of OpMap).
     /// </summary>
-    private static readonly Dictionary<int, string> WriteOps = new()
+    private static readonly Dictionary<int, string> WriteOpsLegacy = new()
+    {
+        { 54, ">" },
+        { 55, ">>" },
+        { 64, "&>" },
+        { 65, "&>>" }
+    };
+
+    private static readonly Dictionary<int, string> WriteOpsNew = new()
     {
         { 63, ">" },
         { 64, ">>" },
@@ -291,15 +315,16 @@ public sealed class BashExtractor : IShellExtractor
     /// </summary>
     private static HashSet<string> CollectOps(JsonElement node)
     {
+        bool useLegacyOpCodes = UsesLegacyOperatorCodes(node);
         var ops = new HashSet<string>();
-        CollectOpsRecursive(node, ops);
+        CollectOpsRecursive(node, ops, useLegacyOpCodes);
         return ops;
     }
 
     /// <summary>
     /// Recursively collects operators.
     /// </summary>
-    private static void CollectOpsRecursive(JsonElement node, HashSet<string> ops)
+    private static void CollectOpsRecursive(JsonElement node, HashSet<string> ops, bool useLegacyOpCodes)
     {
         if (node.ValueKind != JsonValueKind.Object)
             return;
@@ -318,18 +343,19 @@ public sealed class BashExtractor : IShellExtractor
             ops.Add("=");
 
         // Check Op field
-        if (node.GetPropertyOrNull("Op")?.GetInt32() is int opCode && OpMap.TryGetValue(opCode, out var opStr))
+        if (node.GetPropertyOrNull("Op")?.GetInt32() is int opCode
+            && TryMapOperatorCode(opCode, useLegacyOpCodes, out var opStr))
             ops.Add(opStr);
 
         // Recurse into all properties
         foreach (var prop in node.EnumerateObject())
         {
             if (prop.Value.ValueKind == JsonValueKind.Object)
-                CollectOpsRecursive(prop.Value, ops);
+                CollectOpsRecursive(prop.Value, ops, useLegacyOpCodes);
             else if (prop.Value.ValueKind == JsonValueKind.Array)
             {
                 foreach (var item in prop.Value.EnumerateArray())
-                    CollectOpsRecursive(item, ops);
+                    CollectOpsRecursive(item, ops, useLegacyOpCodes);
             }
         }
     }
@@ -339,15 +365,20 @@ public sealed class BashExtractor : IShellExtractor
     /// </summary>
     private static List<(string Op, string Dest)> CollectRedirects(JsonElement node, string originalCmd)
     {
+        bool useLegacyOpCodes = UsesLegacyOperatorCodes(node);
         var redirects = new List<(string, string)>();
-        CollectRedirectsRecursive(node, originalCmd, redirects);
+        CollectRedirectsRecursive(node, originalCmd, redirects, useLegacyOpCodes);
         return redirects;
     }
 
     /// <summary>
     /// Recursively collects redirects.
     /// </summary>
-    private static void CollectRedirectsRecursive(JsonElement node, string originalCmd, List<(string, string)> redirects)
+    private static void CollectRedirectsRecursive(
+        JsonElement node,
+        string originalCmd,
+        List<(string, string)> redirects,
+        bool useLegacyOpCodes)
     {
         if (node.ValueKind != JsonValueKind.Object)
             return;
@@ -358,7 +389,7 @@ public sealed class BashExtractor : IShellExtractor
             foreach (var redir in redirList.EnumerateArray().Where(r => r.ValueKind == JsonValueKind.Object))
             {
                 int? opCode = redir.GetPropertyOrNull("Op")?.GetInt32();
-                if (opCode.HasValue && WriteOps.TryGetValue(opCode.Value, out var op) &&
+                if (opCode.HasValue && TryMapWriteOperatorCode(opCode.Value, useLegacyOpCodes, out var op) &&
                     redir.GetPropertyOrNull("Word") is JsonElement word && word.ValueKind == JsonValueKind.Object)
                 {
                     redirects.Add((op, WordText(word, originalCmd)));
@@ -370,11 +401,11 @@ public sealed class BashExtractor : IShellExtractor
         foreach (var prop in node.EnumerateObject())
         {
             if (prop.Value.ValueKind == JsonValueKind.Object)
-                CollectRedirectsRecursive(prop.Value, originalCmd, redirects);
+                CollectRedirectsRecursive(prop.Value, originalCmd, redirects, useLegacyOpCodes);
             else if (prop.Value.ValueKind == JsonValueKind.Array)
             {
                 foreach (var item in prop.Value.EnumerateArray())
-                    CollectRedirectsRecursive(item, originalCmd, redirects);
+                    CollectRedirectsRecursive(item, originalCmd, redirects, useLegacyOpCodes);
             }
         }
     }
@@ -392,63 +423,185 @@ public sealed class BashExtractor : IShellExtractor
         var extraCommands = new List<string>();
         var extraDests = new List<(string, string)>();
 
-        execFlags ??= new Dictionary<string, IReadOnlySet<string>>();
-        destFlags ??= new Dictionary<string, IReadOnlySet<string>>();
-        destPos ??= new Dictionary<string, IReadOnlySet<int>>();
-        execPos ??= new Dictionary<string, IReadOnlySet<int>>();
+        execFlags ??= EmptyStringMap;
+        destFlags ??= EmptyStringMap;
+        destPos ??= EmptyIntMap;
+        execPos ??= EmptyIntMap;
 
         foreach (var tokens in commands)
         {
             if (tokens.Count == 0)
                 continue;
 
-            string cmdName = tokens[0];
-
-            // Scan for exec flags
-            if (execFlags.TryGetValue(cmdName, out var execFlagSet))
-            {
-                for (int i = 0; i < tokens.Count - 1; i++)
-                {
-                    if (execFlagSet.Contains(tokens[i]))
-                        extraCommands.Add(tokens[i + 1]);
-                }
-            }
-
-            // Scan for dest flags
-            if (destFlags.TryGetValue(cmdName, out var destFlagSet))
-            {
-                for (int i = 0; i < tokens.Count - 1; i++)
-                {
-                    if (destFlagSet.Contains(tokens[i]))
-                        extraDests.Add((tokens[i], tokens[i + 1]));
-                }
-            }
-
-            // Scan for positional exec args
-            var args = tokens.Skip(1).ToList();
-            if (execPos.TryGetValue(cmdName, out var execPosSet))
-            {
-                foreach (int idx in execPosSet)
-                {
-                    int actualIdx = idx < 0 ? args.Count + idx : idx;
-                    if (actualIdx >= 0 && actualIdx < args.Count)
-                        extraCommands.Add(args[actualIdx]);
-                }
-            }
-
-            // Scan for positional dest args
-            if (destPos.TryGetValue(cmdName, out var destPosSet))
-            {
-                foreach (int idx in destPosSet)
-                {
-                    int actualIdx = idx < 0 ? args.Count + idx : idx;
-                    if (actualIdx >= 0 && actualIdx < args.Count)
-                        extraDests.Add((idx.ToString(System.Globalization.CultureInfo.InvariantCulture), args[actualIdx]));
-                }
-            }
+            CollectExecFlagCommands(tokens, execFlags, extraCommands);
+            CollectDestFlagArguments(tokens, destFlags, extraDests);
+            CollectExecPosCommands(tokens, execPos, extraCommands);
+            CollectDestPosArguments(tokens, destPos, extraDests);
         }
 
         return (extraCommands, extraDests);
+    }
+
+    private static readonly IReadOnlyDictionary<string, IReadOnlySet<string>> EmptyStringMap
+        = new Dictionary<string, IReadOnlySet<string>>();
+
+    private static readonly IReadOnlyDictionary<string, IReadOnlySet<int>> EmptyIntMap
+        = new Dictionary<string, IReadOnlySet<int>>();
+
+    private static void CollectExecFlagCommands(
+        IReadOnlyList<string> tokens,
+        IReadOnlyDictionary<string, IReadOnlySet<string>> execFlags,
+        ICollection<string> extraCommands)
+    {
+        foreach (var flagSet in GetMostSpecificMatches(tokens, execFlags).Select(static match => match.Value))
+            CollectFlagArguments(tokens, flagSet, static (op, arg) => arg, extraCommands);
+    }
+
+    private static void CollectDestFlagArguments(
+        IReadOnlyList<string> tokens,
+        IReadOnlyDictionary<string, IReadOnlySet<string>> destFlags,
+        ICollection<(string, string)> extraDests)
+    {
+        foreach (var flagSet in GetMostSpecificMatches(tokens, destFlags).Select(static match => match.Value))
+            CollectFlagArguments(tokens, flagSet, static (op, arg) => (op, arg), extraDests);
+    }
+
+    private static void CollectExecPosCommands(
+        IReadOnlyList<string> tokens,
+        IReadOnlyDictionary<string, IReadOnlySet<int>> execPos,
+        ICollection<string> extraCommands)
+    {
+        foreach (var match in GetMostSpecificMatches(tokens, execPos))
+            CollectPositionalArguments(tokens, match, static (_, arg) => arg, extraCommands);
+    }
+
+    private static void CollectDestPosArguments(
+        IReadOnlyList<string> tokens,
+        IReadOnlyDictionary<string, IReadOnlySet<int>> destPos,
+        ICollection<(string, string)> extraDests)
+    {
+        foreach (var match in GetMostSpecificMatches(tokens, destPos))
+            CollectPositionalArguments(
+                tokens,
+                match,
+                static (idx, arg) => (idx.ToString(System.Globalization.CultureInfo.InvariantCulture), arg),
+                extraDests);
+    }
+
+    private static void CollectFlagArguments<T>(
+        IReadOnlyList<string> tokens,
+        IReadOnlySet<string> flagSet,
+        Func<string, string, T> projection,
+        ICollection<T> output)
+    {
+        for (int index = 0; index < tokens.Count - 1; index++)
+        {
+            string token = tokens[index];
+            if (!flagSet.Contains(token))
+                continue;
+
+            output.Add(projection(token, tokens[index + 1]));
+        }
+    }
+
+    private static void CollectPositionalArguments<T>(
+        IReadOnlyList<string> tokens,
+        (int KeyTokenCount, IReadOnlySet<int> Value) match,
+        Func<int, string, T> projection,
+        ICollection<T> output)
+    {
+        var args = tokens.Skip(match.KeyTokenCount).ToList();
+        foreach (int idx in match.Value)
+        {
+            int actualIdx = idx < 0 ? args.Count + idx : idx;
+            if (actualIdx < 0 || actualIdx >= args.Count)
+                continue;
+
+            output.Add(projection(idx, args[actualIdx]));
+        }
+    }
+
+    internal static bool TryMapOperatorCode(int opCode, bool useLegacyOpCodes, out string op)
+    {
+        return (useLegacyOpCodes ? OpMapLegacy : OpMapNew).TryGetValue(opCode, out op!);
+    }
+
+    internal static bool TryMapWriteOperatorCode(int opCode, bool useLegacyOpCodes, out string op)
+    {
+        return (useLegacyOpCodes ? WriteOpsLegacy : WriteOpsNew).TryGetValue(opCode, out op!);
+    }
+
+    private static bool UsesLegacyOperatorCodes(JsonElement node)
+    {
+        var opCodes = new HashSet<int>();
+        CollectOpCodes(node, opCodes);
+        return opCodes.Overlaps([10, 54, 55, 56, 58, 59]);
+    }
+
+    private static void CollectOpCodes(JsonElement node, HashSet<int> opCodes)
+    {
+        if (node.ValueKind != JsonValueKind.Object)
+            return;
+
+        if (node.GetPropertyOrNull("Op")?.GetInt32() is int opCode)
+            opCodes.Add(opCode);
+
+        foreach (var prop in node.EnumerateObject())
+        {
+            if (prop.Value.ValueKind == JsonValueKind.Object)
+            {
+                CollectOpCodes(prop.Value, opCodes);
+            }
+            else if (prop.Value.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in prop.Value.EnumerateArray())
+                    CollectOpCodes(item, opCodes);
+            }
+        }
+    }
+
+    private static List<(int KeyTokenCount, T Value)> GetMostSpecificMatches<T>(
+        IReadOnlyList<string> commandTokens,
+        IReadOnlyDictionary<string, T> map)
+    {
+        var matches = new List<(int KeyTokenCount, T Value)>();
+        int maxTokenCount = 0;
+
+        foreach (var kvp in map)
+        {
+            int keyTokenCount = CountMatchingPrefixTokens(kvp.Key, commandTokens);
+            if (keyTokenCount == 0)
+                continue;
+
+            if (keyTokenCount > maxTokenCount)
+            {
+                matches.Clear();
+                maxTokenCount = keyTokenCount;
+            }
+
+            if (keyTokenCount == maxTokenCount)
+                matches.Add((keyTokenCount, kvp.Value));
+        }
+
+        return matches;
+    }
+
+    private static int CountMatchingPrefixTokens(string key, IReadOnlyList<string> commandTokens)
+    {
+        string[] keyTokens = key.Split(
+            [' ', '\t', '\r', '\n', '\f', '\v'],
+            StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        if (keyTokens.Length == 0 || keyTokens.Length > commandTokens.Count)
+            return 0;
+
+        for (int index = 0; index < keyTokens.Length; index++)
+        {
+            if (!string.Equals(keyTokens[index], commandTokens[index], StringComparison.Ordinal))
+                return 0;
+        }
+
+        return keyTokens.Length;
     }
 
     /// <summary>

@@ -529,6 +529,49 @@ public sealed class BashExtractorTests
     }
 
     [Fact]
+    public async Task Extract_MostSpecificExecPosRule_UsesFullCommandPrefix()
+    {
+        SkipIfShfmtMissing();
+        var execPos = new Dictionary<string, IReadOnlySet<int>>
+        {
+            { "git", new HashSet<int> { 0 } },
+            { "git clone", new HashSet<int> { 0 } }
+        };
+
+        var result = await BashExtractor.ExtractAsync(
+            "git clone ls destination",
+            execPos: execPos);
+
+        var actualCmds = result.Commands.Select(c => c.ToList()).ToList();
+        actualCmds.Count.ShouldBe(2);
+        actualCmds[0].ShouldBe(new[] { "git", "clone", "ls", "destination" });
+        actualCmds[1].ShouldBe(new[] { "ls" });
+    }
+
+    [Fact]
+    public void TryMapOperatorCode_LegacyAndNewModes_MapExpectedValues()
+    {
+        BashExtractor.TryMapOperatorCode(10, useLegacyOpCodes: true, out string legacyAnd).ShouldBeTrue();
+        legacyAnd.ShouldBe("&&");
+
+        BashExtractor.TryMapOperatorCode(11, useLegacyOpCodes: false, out string newAnd).ShouldBeTrue();
+        newAnd.ShouldBe("&&");
+
+        BashExtractor.TryMapOperatorCode(11, useLegacyOpCodes: true, out string legacyOr).ShouldBeTrue();
+        legacyOr.ShouldBe("||");
+    }
+
+    [Fact]
+    public void TryMapWriteOperatorCode_LegacyAndNewModes_MapExpectedValues()
+    {
+        BashExtractor.TryMapWriteOperatorCode(54, useLegacyOpCodes: true, out string legacyWrite).ShouldBeTrue();
+        legacyWrite.ShouldBe(">");
+
+        BashExtractor.TryMapWriteOperatorCode(63, useLegacyOpCodes: false, out string newWrite).ShouldBeTrue();
+        newWrite.ShouldBe(">");
+    }
+
+    [Fact]
     public async Task Extract_UnhandledConstruct_ThrowsInvalidOperation()
     {
         SkipIfShfmtMissing();

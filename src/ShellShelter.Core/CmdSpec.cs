@@ -189,6 +189,34 @@ public sealed class CmdSpec : IEquatable<CmdSpec>
         return hashCode.ToHashCode();
     }
 
+    internal bool HasSameSemantics(CmdSpec other)
+    {
+        ArgumentNullException.ThrowIfNull(other);
+
+        return _name.SequenceEqual(other._name, StringComparer.Ordinal)
+            && _denied.SetEquals(other._denied)
+            && _execFlags.SetEquals(other._execFlags)
+            && _destFlags.SetEquals(other._destFlags)
+            && _execPos.SetEquals(other._execPos)
+            && _destPos.SetEquals(other._destPos);
+    }
+
+    internal CmdSpec MergeWith(CmdSpec other)
+    {
+        ArgumentNullException.ThrowIfNull(other);
+
+        if (!_name.SequenceEqual(other._name, StringComparer.Ordinal))
+            throw new InvalidOperationException("CmdSpec merge requires identical command name prefixes.");
+
+        return new CmdSpec(
+            string.Join(" ", _name),
+            denied: _denied.Union(other._denied, StringComparer.Ordinal),
+            execFlags: _execFlags.Union(other._execFlags, StringComparer.Ordinal),
+            destFlags: _destFlags.Union(other._destFlags, StringComparer.Ordinal),
+            execPos: _execPos.Union(other._execPos),
+            destPos: _destPos.Union(other._destPos));
+    }
+
     /// <inheritdoc />
     public override string ToString()
     {

@@ -116,6 +116,18 @@ public sealed class ShellPolicy
                 continue;
             }
 
+            if (target.TryGetValue(value, out CmdSpec? existing))
+            {
+                if (!existing.HasSameSemantics(value))
+                {
+                    CmdSpec merged = existing.MergeWith(value);
+                    target.Remove(existing);
+                    target.Add(merged);
+                }
+
+                continue;
+            }
+
             target.Add(value);
         }
     }

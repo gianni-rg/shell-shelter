@@ -9,7 +9,7 @@ public sealed class ShellPolicyTests
     public void Constructor_WithValues_DeduplicatesCommandsByNameAndTrimsDestinations()
     {
         ShellPolicy policy = new(
-            [new CmdSpec("cat"), new CmdSpec("cat", denied: ["-n"]), new CmdSpec("git status")],
+            [new CmdSpec("cat"), new CmdSpec("cat"), new CmdSpec("git status")],
             [" ./ ", "./", null!, "/tmp"]);
 
         policy.OkCmds.OrderBy(static spec => string.Join(" ", spec.Name), StringComparer.Ordinal)
@@ -43,5 +43,27 @@ public sealed class ShellPolicyTests
         policy.OkCmds.OrderBy(static spec => string.Join(" ", spec.Name), StringComparer.Ordinal)
             .ShouldBe([new CmdSpec("cat"), new CmdSpec("git status")]);
         policy.OkDests.OrderBy(static dest => dest, StringComparer.Ordinal).ShouldBe(["./", "/tmp"]);
+    }
+
+    [Fact]
+    public void Constructor_ConflictingDuplicateCmdSpec_MergesMetadataConservatively()
+    {
+        ShellPolicy policy = new(
+            [new CmdSpec("curl", destFlags: ["-o"]),
+             new CmdSpec("curl", destFlags: ["--output"])],
+            ["./"]);
+
+        CmdSpec curl = policy.OkCmds.Single(static spec => spec.Equals(new CmdSpec("curl")));
+        curl.DestFlags.SetEquals(["--output", "-o"]).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void WithAdd_ConflictingDuplicateCmdSpec_MergesMetadataConservatively()
+    {
+        var policy = new ShellPolicy([new CmdSpec("curl", destFlags: ["-o"])], ["./"]);
+        ShellPolicy merged = policy.WithAdd(addCmds: [new CmdSpec("curl", destFlags: ["--output"])]);
+
+        CmdSpec curl = merged.OkCmds.Single(static spec => spec.Equals(new CmdSpec("curl")));
+        curl.DestFlags.SetEquals(["--output", "-o"]).ShouldBeTrue();
     }
 }

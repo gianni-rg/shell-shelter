@@ -185,6 +185,7 @@ public static class ShellValidator
         ArgumentNullException.ThrowIfNull(allowedPatterns);
 
         string normalizedDest = NormalizeDestination(destination);
+        string canonicalDest = CanonicalizeForPolicyMatch(normalizedDest);
         StringComparison comparison = OperatingSystem.IsWindows()
             ? StringComparison.OrdinalIgnoreCase
             : StringComparison.Ordinal;
@@ -192,7 +193,8 @@ public static class ShellValidator
         foreach (string pattern in allowedPatterns)
         {
             string normalizedPattern = NormalizeDestination(pattern);
-            if (MatchesAllowedDestinationPrefix(normalizedDest, normalizedPattern, comparison))
+            string canonicalPattern = CanonicalizeForPolicyMatch(normalizedPattern);
+            if (MatchesAllowedDestinationPrefix(canonicalDest, canonicalPattern, comparison))
                 return true;
         }
 
@@ -216,6 +218,52 @@ public static class ShellValidator
 
         char nextChar = destination[allowedPrefix.Length];
         return nextChar == Path.DirectorySeparatorChar || nextChar == Path.AltDirectorySeparatorChar;
+    }
+
+    private static string CanonicalizeForPolicyMatch(string absolutePath)
+    {
+        string canonicalPath = ResolveExistingPathOrParent(absolutePath);
+        return Path.GetFullPath(canonicalPath);
+    }
+
+    private static string ResolveExistingPathOrParent(string absolutePath)
+    {
+        if (File.Exists(absolutePath) || Directory.Exists(absolutePath))
+            return ResolveLinkTargetOrSelf(absolutePath);
+
+        string? parent = Path.GetDirectoryName(absolutePath);
+        if (string.IsNullOrEmpty(parent))
+            return absolutePath;
+
+        string resolvedParent = ResolveExistingPathOrParent(parent);
+        string leaf = Path.GetFileName(absolutePath);
+        return string.IsNullOrEmpty(leaf)
+            ? resolvedParent
+            : Path.Combine(resolvedParent, leaf);
+    }
+
+    private static string ResolveLinkTargetOrSelf(string path)
+    {
+        try
+        {
+            if (Directory.Exists(path))
+            {
+                var directoryInfo = new DirectoryInfo(path);
+                return directoryInfo.ResolveLinkTarget(returnFinalTarget: true)?.FullName ?? directoryInfo.FullName;
+            }
+
+            if (File.Exists(path))
+            {
+                var fileInfo = new FileInfo(path);
+                return fileInfo.ResolveLinkTarget(returnFinalTarget: true)?.FullName ?? fileInfo.FullName;
+            }
+        }
+        catch
+        {
+            // Fall back to lexical normalization if link resolution is unavailable.
+        }
+
+        return path;
     }
 
     /// <summary>

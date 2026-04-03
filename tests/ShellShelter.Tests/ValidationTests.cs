@@ -246,4 +246,41 @@ public sealed class ValidationTests
 
         Should.NotThrow(() => ShellValidator.Validate(extraction, policy));
     }
+
+    [Fact]
+    public void ValidateDestination_SymlinkEscapesAllowlist_ReturnsFalse()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "shellshelter-tests", Guid.NewGuid().ToString("N"));
+        string allowedRoot = Path.Combine(root, "allowed");
+        string outsideRoot = Path.Combine(root, "outside");
+        string linkPath = Path.Combine(allowedRoot, "linked");
+
+        Directory.CreateDirectory(allowedRoot);
+        Directory.CreateDirectory(outsideRoot);
+
+        try
+        {
+            try
+            {
+                Directory.CreateSymbolicLink(linkPath, outsideRoot);
+            }
+            catch (Exception ex) when (ex is UnauthorizedAccessException or PlatformNotSupportedException or IOException)
+            {
+                Assert.Skip("Symbolic links are unavailable in this environment.");
+                return;
+            }
+
+            string escapedDest = Path.Combine(linkPath, "file.txt");
+            var allowed = new HashSet<string> { allowedRoot };
+
+            bool result = ShellValidator.ValidateDestination(escapedDest, allowed);
+
+            result.ShouldBeFalse();
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+                Directory.Delete(root, recursive: true);
+        }
+    }
 }

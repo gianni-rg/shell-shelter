@@ -362,7 +362,7 @@ public static class BashTools
             if (spec.Name.Count == 0)
                 continue;
 
-            string cmdName = spec.Name[0];
+            string cmdName = string.Join(" ", spec.Name);
 
             AddStringMapValues(execFlags, cmdName, spec.ExecFlags);
             AddStringMapValues(destFlags, cmdName, spec.DestFlags);

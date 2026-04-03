@@ -29,17 +29,18 @@ public sealed class BashExtractor : IShellExtractor
     /// </summary>
     private static readonly Dictionary<int, string> OpMap = new()
     {
-        { 10, "&&" },
-        { 11, "||" },
-        { 12, "|" },
-        { 13, "|&" },
-        { 54, ">" },
-        { 55, ">>" },
-        { 56, "<" },
-        { 58, "<&" },
-        { 59, ">&" },
-        { 64, "&>" },
-        { 65, "&>>" }
+        // shfmt v3.13+ op codes
+        { 11, "&&" },
+        { 12, "||" },
+        { 13, "|" },
+        { 14, "|&" },
+        { 63, ">" },
+        { 64, ">>" },
+        { 65, "<" },
+        { 67, "<&" },
+        { 68, ">&" },
+        { 74, "&>" },
+        { 76, "&>>" }
     };
 
     /// <summary>
@@ -47,20 +48,10 @@ public sealed class BashExtractor : IShellExtractor
     /// </summary>
     private static readonly Dictionary<int, string> WriteOps = new()
     {
-        { 54, ">" },
-        { 55, ">>" },
-        { 64, "&>" },
-        { 65, "&>>" }
-    };
-
-    /// <summary>
-    /// Attribute names that represent operators.
-    /// </summary>
-    private static readonly Dictionary<string, string> AttrOps = new()
-    {
-        { "Background", "&" },
-        { "Semicolon", ";" },
-        { "Assigns", "=" }
+        { 63, ">" },
+        { 64, ">>" },
+        { 74, "&>" },
+        { 76, "&>>" }
     };
 
     /// <summary>
@@ -157,7 +148,7 @@ public sealed class BashExtractor : IShellExtractor
         }
 
         // Check if it's braced
-        bool isBraced = part.GetPropertyOrNull("Rbrace")?.ValueKind != JsonValueKind.Undefined;
+        bool isBraced = part.GetPropertyOrNull("Rbrace") is JsonElement;
         return isBraced ? "${" + name + "}" : "$" + name;
     }
 
@@ -225,7 +216,7 @@ public sealed class BashExtractor : IShellExtractor
                     commands[^1].Add(hdocText);
                 }
                 // Handle here-string (<<<)
-                else if (redirect.GetPropertyOrNull("Op")?.GetInt32() == 63)
+                else if (redirect.GetPropertyOrNull("Op")?.GetInt32() == 73)
                 {
                     commands[^1].Add("<<<");
                     if (redirect.GetPropertyOrNull("Word") is JsonElement word && word.ValueKind == JsonValueKind.Object)
@@ -317,12 +308,18 @@ public sealed class BashExtractor : IShellExtractor
         if (node.ValueKind != JsonValueKind.Object)
             return;
 
-        // Check attribute-based operators
-        foreach (var (attr, op) in AttrOps)
-        {
-            if (node.GetPropertyOrNull(attr)?.ValueKind != JsonValueKind.Undefined)
-                ops.Add(op);
-        }
+        // Check attribute-based operators. Properties must exist and be meaningful.
+        if (node.GetPropertyOrNull("Background") is JsonElement bgEl
+            && bgEl.ValueKind == JsonValueKind.True)
+            ops.Add("&");
+
+        if (node.GetPropertyOrNull("Semicolon") is JsonElement)
+            ops.Add(";");
+
+        if (node.GetPropertyOrNull("Assigns") is JsonElement assignsEl
+            && assignsEl.ValueKind == JsonValueKind.Array
+            && assignsEl.GetArrayLength() > 0)
+            ops.Add("=");
 
         // Check Op field
         if (node.GetPropertyOrNull("Op")?.GetInt32() is int opCode && OpMap.TryGetValue(opCode, out var opStr))

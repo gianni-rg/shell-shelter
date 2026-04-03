@@ -25,7 +25,7 @@ public sealed class BashExtractorTests
         var expectedCmds = expectedCommands.Select(c => c.ToList()).ToList();
 
         actualCmds.ShouldBe(expectedCmds);
-        result.Operators.ShouldBe(expectedOps ?? new HashSet<string>());
+        result.Operators.SetEquals(expectedOps ?? new HashSet<string>()).ShouldBeTrue();
         result.Redirects.ShouldBe(expectedRedirects ?? new List<(string, string)>());
     }
     /// <summary>
@@ -528,20 +528,20 @@ public sealed class BashExtractorTests
     }
 
     [Fact]
-    public void Extract_UnhandledConstruct_ThrowsInvalidOperation()
+    public async Task Extract_UnhandledConstruct_ThrowsInvalidOperation()
     {
         SkipIfShfmtMissing();
         // [[ -f foo ]] uses the TestExpression construct which is not handled
-        Should.Throw<InvalidOperationException>(
-            () => BashExtractor.ExtractAsync("[[ -f foo ]]").Result);
+        await Should.ThrowAsync<InvalidOperationException>(
+            () => BashExtractor.ExtractAsync("[[ -f foo ]]"));
     }
 
     [Fact]
-    public void Extract_EmptyCommand_ThrowsArgumentNull()
+    public async Task Extract_EmptyCommand_ThrowsArgumentNull()
     {
         SkipIfShfmtMissing();
-        Should.Throw<ArgumentNullException>(
-            () => BashExtractor.ExtractAsync("").Result);
+        await Should.ThrowAsync<ArgumentNullException>(
+            () => BashExtractor.ExtractAsync(""));
     }
 
     [Fact]

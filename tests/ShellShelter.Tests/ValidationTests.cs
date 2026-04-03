@@ -1,0 +1,365 @@
+using Shouldly;
+using ShellShelter.Core;
+
+namespace ShellShelter.Tests;
+
+/// <summary>
+/// Tests for ShellValidator module.
+/// </summary>
+public sealed class ValidationTests
+{
+    private static ShellPolicy GetDefaultPolicy()
+    {
+        var policy = new ShellPolicy();
+        
+        // Add common safe commands
+        policy.OkCmds.Add(new CmdSpec("echo"));
+        policy.OkCmds.Add(new CmdSpec("cat"));
+        policy.OkCmds.Add(new CmdSpec("ls"));
+        policy.OkCmds.Add(new CmdSpec("grep"));
+        policy.OkCmds.Add(new CmdSpec("find", execFlags: new[] { "-exec", "-execdir" }));
+        policy.OkCmds.Add(new CmdSpec("curl", destFlags: new[] { "-o", "--output" }));
+        
+        // Add allowed destinations
+        policy.OkDests.Add("./");
+        policy.OkDests.Add("/tmp");
+        policy.OkDests.Add("/dev/null");
+
+        return policy;
+    }
+
+    [Fact]
+    public void ValidateCommand_AllowedCommand_DoesNotThrow()
+    {
+        var policy = GetDefaultPolicy();
+        var tokens = new[] { "echo", "hello" };
+
+        Should.NotThrow(() => ShellValidator.ValidateCommand(tokens, policy.OkCmds));
+    }
+
+    [Fact]
+    public void ValidateCommand_DisallowedCommand_ThrowsDisallowedCmdException()
+    {
+        var policy = GetDefaultPolicy();
+        var tokens = new[] { "rm", "-rf", "/" };
+
+        Should.Throw<DisallowedCmdException>(() =>
+            ShellValidator.ValidateCommand(tokens, policy.OkCmds));
+    }
+
+    [Fact]
+    public void ValidateCommand_EmptyTokens_ThrowsDisallowedCmdException()
+    {
+        var policy = GetDefaultPolicy();
+        var tokens = Array.Empty<string>();
+
+        Should.Throw<DisallowedCmdException>(() =>
+            ShellValidator.ValidateCommand(tokens, policy.OkCmds));
+    }
+
+    [Fact]
+    public void ValidateCommand_PartialCommandMatch_AllowedIfPrefixMatches()
+    {
+        var policy = new ShellPolicy();
+        policy.OkCmds.Add(new CmdSpec("git status"));
+        
+        var tokens = new[] { "git", "status", "--porcelain" };
+        
+        Should.NotThrow(() => ShellValidator.ValidateCommand(tokens, policy.OkCmds));
+    }
+
+    [Fact]
+    public void ValidateDestination_AllowedPath_ReturnsTrue()
+    {
+        var allowedDests = new HashSet<string> { "./", "/tmp" };
+        
+        bool result = ShellValidator.ValidateDestination("./output.txt", allowedDests);
+        
+        result.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void ValidateDestination_DisallowedPath_ReturnsFalse()
+    {
+        var allowedDests = new HashSet<string> { "./", "/tmp" };
+        
+        bool result = ShellValidator.ValidateDestination("/etc/passwd", allowedDests);
+        
+        result.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void ValidateDestination_AbsolutePathInAllowedDir_ReturnsTrue()
+    {
+        var currentDir = Directory.GetCurrentDirectory();
+        var allowedDests = new HashSet<string> { "./" };
+        var destInCurrentDir = Path.Combine(currentDir, "test.txt");
+        
+        bool result = ShellValidator.ValidateDestination(destInCurrentDir, allowedDests);
+        
+        result.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void ValidateDestination_TmpPath_ReturnsTrue()
+    {
+        var allowedDests = new HashSet<string> { "/tmp" };
+        
+        bool result = ShellValidator.ValidateDestination("/tmp/output.log", allowedDests);
+        
+        result.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void ValidateDestination_PrefixWithoutBoundary_ReturnsFalse()
+    {
+        var allowedDests = new HashSet<string> { "/tmp" };
+
+        bool result = ShellValidator.ValidateDestination("/tmpfile", allowedDests);
+
+        result.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void NormalizeDestination_TildePath_ExpandsToHome()
+    {
+        string input = "~/test.txt";
+        string expected = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "test.txt");
+        
+        string result = ShellValidator.NormalizeDestination(input);
+        
+        result.ShouldBe(expected);
+    }
+
+    [Fact]
+    public void NormalizeDestination_TildeOnly_ExpandsToHome()
+    {
+        string input = "~";
+        string expected = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        
+        string result = ShellValidator.NormalizeDestination(input);
+        
+        result.ShouldBe(expected);
+    }
+
+    [Fact]
+    public void NormalizeDestination_RelativePath_BecomesAbsolute()
+    {
+        string input = "./test.txt";
+        string expected = Path.Combine(Directory.GetCurrentDirectory(), "test.txt");
+        
+        string result = ShellValidator.NormalizeDestination(input);
+        
+        result.ShouldBe(expected);
+    }
+
+    [Fact]
+    public void NormalizeDestination_EnvironmentVariable_Expanded()
+    {
+        var tmpDir = Path.GetTempPath();
+        Environment.SetEnvironmentVariable("TEST_DIR", tmpDir);
+        
+        string input = "$TEST_DIR/test.txt";
+        string result = ShellValidator.NormalizeDestination(input);
+        
+        result.ShouldStartWith(tmpDir);
+    }
+
+    [Fact]
+    public void Validate_AllowedCommand_DoesNotThrow()
+    {
+        var policy = GetDefaultPolicy();
+        var extraction = new ExtractionResult(
+            new[] { new[] { "echo", "hello" }.AsReadOnly() }.AsReadOnly(),
+            new HashSet<string>(),
+            new List<(string, string)>());
+
+        Should.NotThrow(() => ShellValidator.Validate(extraction, policy));
+    }
+
+    [Fact]
+    public void Validate_DisallowedCommand_ThrowsDisallowedCmdException()
+    {
+        var policy = GetDefaultPolicy();
+        var extraction = new ExtractionResult(
+            new[] { new[] { "rm", "-rf", "/" }.AsReadOnly() }.AsReadOnly(),
+            new HashSet<string>(),
+            new List<(string, string)>());
+
+        Should.Throw<DisallowedCmdException>(() => ShellValidator.Validate(extraction, policy));
+    }
+
+    [Fact]
+    public void Validate_DisallowedRedirectDest_ThrowsDisallowedDestException()
+    {
+        var policy = GetDefaultPolicy();
+        var extraction = new ExtractionResult(
+            new[] { new[] { "echo", "hello" }.AsReadOnly() }.AsReadOnly(),
+            new HashSet<string> { ">" },
+            new List<(string, string)> { (">", "/etc/passwd") });
+
+        Should.Throw<DisallowedDestException>(() => ShellValidator.Validate(extraction, policy));
+    }
+
+    [Fact]
+    public void Validate_DestinationFlag_DisallowedPath_ThrowsDisallowedDestException()
+    {
+        var policy = new ShellPolicy(
+            okCmds: [new CmdSpec("curl", destFlags: ["-o", "--output"])],
+            okDests: ["./", "/tmp"]);
+
+        var extraction = new ExtractionResult(
+            new[] { new[] { "curl", "-o", "/etc/passwd", "https://example.com" }.AsReadOnly() }.AsReadOnly(),
+            new HashSet<string>(),
+            new List<(string, string)>());
+
+        Should.Throw<DisallowedDestException>(() => ShellValidator.Validate(extraction, policy));
+    }
+
+    [Fact]
+    public void Validate_MostSpecificMatchingSpec_IsUsedForDestinationValidation()
+    {
+        var policy = new ShellPolicy(
+            okCmds:
+            [
+                new CmdSpec("git"),
+                new CmdSpec("git clone", destPos: [0]),
+            ],
+            okDests: ["./", "/tmp"]);
+
+        var extraction = new ExtractionResult(
+            new[] { new[] { "git", "clone", "/etc/passwd" }.AsReadOnly() }.AsReadOnly(),
+            new HashSet<string>(),
+            new List<(string, string)>());
+
+        Should.Throw<DisallowedDestException>(() => ShellValidator.Validate(extraction, policy));
+    }
+
+    [Fact]
+    public void Validate_AllowedRedirectDest_DoesNotThrow()
+    {
+        var policy = GetDefaultPolicy();
+        var extraction = new ExtractionResult(
+            new[] { new[] { "echo", "hello" }.AsReadOnly() }.AsReadOnly(),
+            new HashSet<string> { ">" },
+            new List<(string, string)> { (">", "./output.txt") });
+
+        Should.NotThrow(() => ShellValidator.Validate(extraction, policy));
+    }
+
+    // Round-4 PR #1 comment: DisallowedDestException.Destination must never be a raw command
+    // string for missing-destination scenarios; the stable placeholder "<missing>" is used instead.
+
+    [Fact]
+    public void ValidateDestinationArgs_MissingPositionalDest_DestinationIsPlaceholder()
+    {
+        // cp spec with dest at positional index 1 (second arg after command name).
+        // Supplying only one arg makes the index out of range.
+        var policy = new ShellPolicy(
+            okCmds: [new CmdSpec("cp", destPos: [1])],
+            okDests: ["./", "/tmp"]);
+
+        var extraction = new ExtractionResult(
+            new[] { new[] { "cp", "source-only" }.AsReadOnly() }.AsReadOnly(),
+            new HashSet<string>(),
+            new List<(string, string)>());
+
+        var ex = Should.Throw<DisallowedDestException>(() => ShellValidator.Validate(extraction, policy));
+        ex.Destination.ShouldBe("<missing>");
+        ex.Message.ShouldContain("cp");
+    }
+
+    [Fact]
+    public void ValidateDestinationArgs_MissingFlagValueSpaceForm_DestinationIsPlaceholder()
+    {
+        // curl -o with no path following it.
+        var policy = new ShellPolicy(
+            okCmds: [new CmdSpec("curl", destFlags: ["-o"])],
+            okDests: ["./", "/tmp"]);
+
+        var extraction = new ExtractionResult(
+            new[] { new[] { "curl", "-o" }.AsReadOnly() }.AsReadOnly(),
+            new HashSet<string>(),
+            new List<(string, string)>());
+
+        var ex = Should.Throw<DisallowedDestException>(() => ShellValidator.Validate(extraction, policy));
+        ex.Destination.ShouldBe("<missing>");
+        ex.Message.ShouldContain("-o");
+    }
+
+    [Fact]
+    public void ValidateDestinationArgs_MissingFlagValueEqualsForm_DestinationIsPlaceholder()
+    {
+        // -o= with an empty value after the equals sign.
+        var policy = new ShellPolicy(
+            okCmds: [new CmdSpec("curl", destFlags: ["-o"])],
+            okDests: ["./", "/tmp"]);
+
+        var extraction = new ExtractionResult(
+            new[] { new[] { "curl", "-o=" }.AsReadOnly() }.AsReadOnly(),
+            new HashSet<string>(),
+            new List<(string, string)>());
+
+        var ex = Should.Throw<DisallowedDestException>(() => ShellValidator.Validate(extraction, policy));
+        ex.Destination.ShouldBe("<missing>");
+        ex.Message.ShouldContain("-o");
+    }
+
+    [Fact]
+    public void ValidateDestinationArgs_MissingFlagValueColonForm_DestinationIsPlaceholder()
+    {
+        // PowerShell-style -FilePath: with empty value after the colon.
+        var policy = new ShellPolicy(
+            okCmds: [new CmdSpec("Tee-Object", destFlags: ["-FilePath"])],
+            okDests: ["./", "/tmp"]);
+
+        var extraction = new ExtractionResult(
+            new[] { new[] { "Tee-Object", "-FilePath:" }.AsReadOnly() }.AsReadOnly(),
+            new HashSet<string>(),
+            new List<(string, string)>());
+
+        var ex = Should.Throw<DisallowedDestException>(() =>
+            ShellValidator.Validate(extraction, policy,
+                destinationFlagNamesCaseInsensitive: true,
+                allowPowerShellFlagColonAssignment: true));
+        ex.Destination.ShouldBe("<missing>");
+        ex.Message.ShouldContain("-FilePath");
+    }
+
+    [Fact]
+    public void ValidateDestination_SymlinkEscapesAllowlist_ReturnsFalse()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "shellshelter-tests", Guid.NewGuid().ToString("N"));
+        string allowedRoot = Path.Combine(root, "allowed");
+        string outsideRoot = Path.Combine(root, "outside");
+        string linkPath = Path.Combine(allowedRoot, "linked");
+
+        Directory.CreateDirectory(allowedRoot);
+        Directory.CreateDirectory(outsideRoot);
+
+        try
+        {
+            try
+            {
+                Directory.CreateSymbolicLink(linkPath, outsideRoot);
+            }
+            catch (Exception ex) when (ex is UnauthorizedAccessException or PlatformNotSupportedException or IOException)
+            {
+                Assert.Skip("Symbolic links are unavailable in this environment.");
+                return;
+            }
+
+            string escapedDest = Path.Combine(linkPath, "file.txt");
+            var allowed = new HashSet<string> { allowedRoot };
+
+            bool result = ShellValidator.ValidateDestination(escapedDest, allowed);
+
+            result.ShouldBeFalse();
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+                Directory.Delete(root, recursive: true);
+        }
+    }
+}

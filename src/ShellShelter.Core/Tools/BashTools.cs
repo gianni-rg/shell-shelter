@@ -43,10 +43,17 @@ public static class BashTools
         ArgumentException.ThrowIfNullOrEmpty(cmd);
 
         ShellPolicy policy = LoadBashPolicy().WithRemove(rmCmds, rmDests);
+        var maps = BuildExtractionMaps(policy);
 
         try
         {
-            string output = await BashShell.SafeRunAsync(cmd, policy);
+            string output = await BashShell.SafeRunAsync(
+                cmd,
+                policy,
+                execFlags: maps.ExecFlags,
+                destFlags: maps.DestFlags,
+                execPos: maps.ExecPos,
+                destPos: maps.DestPos);
             return ToolResult.Success(output);
         }
         catch (DisallowedCmdException ex)
@@ -90,10 +97,17 @@ public static class BashTools
             : LoadBashPolicy();
 
         ShellPolicy policy = basePolicy.WithAdd(addCmds, addDests).WithRemove(rmCmds, rmDests);
+        var maps = BuildExtractionMaps(policy);
 
         try
         {
-            string output = await BashShell.SafeRunAsync(cmd, policy);
+            string output = await BashShell.SafeRunAsync(
+                cmd,
+                policy,
+                execFlags: maps.ExecFlags,
+                destFlags: maps.DestFlags,
+                execPos: maps.ExecPos,
+                destPos: maps.DestPos);
             return ToolResult.Success(output);
         }
         catch (DisallowedCmdException ex)
@@ -343,6 +357,89 @@ public static class BashTools
         }
 
         return new ShellPolicy(okCmds, okDests);
+    }
+
+    private static (
+        IReadOnlyDictionary<string, IReadOnlySet<string>> ExecFlags,
+        IReadOnlyDictionary<string, IReadOnlySet<string>> DestFlags,
+        IReadOnlyDictionary<string, IReadOnlySet<int>> ExecPos,
+        IReadOnlyDictionary<string, IReadOnlySet<int>> DestPos)
+        BuildExtractionMaps(ShellPolicy policy)
+    {
+        var execFlags = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+        var destFlags = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+        var execPos = new Dictionary<string, HashSet<int>>(StringComparer.Ordinal);
+        var destPos = new Dictionary<string, HashSet<int>>(StringComparer.Ordinal);
+
+        foreach (CmdSpec spec in policy.OkCmds)
+        {
+            if (spec.Name.Count == 0)
+                continue;
+
+            string cmdName = spec.Name[0];
+
+            if (spec.ExecFlags.Count > 0)
+            {
+                if (!execFlags.TryGetValue(cmdName, out var values))
+                {
+                    values = new HashSet<string>(StringComparer.Ordinal);
+                    execFlags[cmdName] = values;
+                }
+
+                values.UnionWith(spec.ExecFlags);
+            }
+
+            if (spec.DestFlags.Count > 0)
+            {
+                if (!destFlags.TryGetValue(cmdName, out var values))
+                {
+                    values = new HashSet<string>(StringComparer.Ordinal);
+                    destFlags[cmdName] = values;
+                }
+
+                values.UnionWith(spec.DestFlags);
+            }
+
+            if (spec.ExecPos.Count > 0)
+            {
+                if (!execPos.TryGetValue(cmdName, out var values))
+                {
+                    values = new HashSet<int>();
+                    execPos[cmdName] = values;
+                }
+
+                values.UnionWith(spec.ExecPos);
+            }
+
+            if (spec.DestPos.Count > 0)
+            {
+                if (!destPos.TryGetValue(cmdName, out var values))
+                {
+                    values = new HashSet<int>();
+                    destPos[cmdName] = values;
+                }
+
+                values.UnionWith(spec.DestPos);
+            }
+        }
+
+        return (
+            execFlags.ToDictionary(
+                kvp => kvp.Key,
+                kvp => (IReadOnlySet<string>)kvp.Value,
+                StringComparer.Ordinal),
+            destFlags.ToDictionary(
+                kvp => kvp.Key,
+                kvp => (IReadOnlySet<string>)kvp.Value,
+                StringComparer.Ordinal),
+            execPos.ToDictionary(
+                kvp => kvp.Key,
+                kvp => (IReadOnlySet<int>)kvp.Value,
+                StringComparer.Ordinal),
+            destPos.ToDictionary(
+                kvp => kvp.Key,
+                kvp => (IReadOnlySet<int>)kvp.Value,
+                StringComparer.Ordinal));
     }
 
     /// <summary>

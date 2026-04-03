@@ -107,7 +107,7 @@ public static class PsTools
     /// Read file content with optional line numbers using PowerShell <c>Get-Content</c>.
     /// </summary>
     /// <remarks>
-    /// Validates the path is accessible (must be an allowed destination or be present on disk).
+    /// Validates the path is accessible (must be an allowed destination or already exist on disk).
     /// Line numbers are prepended using right-aligned formatting.
     /// </remarks>
     [Description("Read a file's content using PowerShell Get-Content. Optionally prepend line numbers.")]
@@ -117,9 +117,19 @@ public static class PsTools
     {
         ArgumentException.ThrowIfNullOrEmpty(path);
 
-        ShellPolicy policy = LoadPsPolicy().WithAdd(addCmds: "Get-Content");
+        ShellPolicy policy = LoadPsPolicy().WithAdd(addCmds: "Get-Content, ForEach-Object");
+        string normalizedPath = ShellValidator.NormalizeDestination(path);
+        bool destAllowed = ShellValidator.ValidateDestination(path, policy.OkDests);
+        bool existsOnDisk = File.Exists(normalizedPath);
+
+        if (!destAllowed && !existsOnDisk)
+        {
+            var denyEx = new DisallowedDestException(path);
+            return ToolResult.Denied(denyEx.Message, policy.OkCmds, policy.OkDests);
+        }
+
         string cmd = lineNumbers
-            ? $"Get-Content -Path {QuotePsArg(path)} | ForEach-Object -Begin {{ $i = 0 }} -Process {{ $i++; \"{0:D} {1}\" -f $i, $_ }}"
+            ? $"Get-Content -Path {QuotePsArg(path)} | ForEach-Object -Begin {{ $i = 0 }} -Process {{ $i++; \"{{0:D}} {{1}}\" -f $i, $_ }}"
             : $"Get-Content -Path {QuotePsArg(path)}";
 
         try

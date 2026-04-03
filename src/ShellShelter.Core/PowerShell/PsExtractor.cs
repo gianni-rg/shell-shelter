@@ -127,15 +127,11 @@ public sealed class PsExtractor : IShellExtractor
         FileRedirectionAst redirAst,
         List<(string, string)> redirects)
     {
-        // Only write redirections matter for destination validation
-        if (redirAst.Append == false || redirAst.Append == true)
-        {
-            // Any output redirection — determine operator string
-            string op = redirAst.Append ? ">>" : ">";
-            string? dest = ExtractText(redirAst.Location);
-            if (!string.IsNullOrWhiteSpace(dest))
-                redirects.Add((op, dest));
-        }
+        // Any output redirection — determine operator string
+        string op = redirAst.Append ? ">>" : ">";
+        string? dest = ExtractText(redirAst.Location);
+        if (!string.IsNullOrWhiteSpace(dest))
+            redirects.Add((op, dest));
     }
 
     /// <summary>

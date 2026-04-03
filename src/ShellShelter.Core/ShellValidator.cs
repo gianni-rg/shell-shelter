@@ -87,7 +87,11 @@ public static class ShellValidator
         {
             int actualIdx = pos < 0 ? args.Count + pos : pos;
             if (actualIdx < 0 || actualIdx >= args.Count)
-                throw new DisallowedDestException(tokens[actualIdx < 0 ? 0 : actualIdx]);
+            {
+                throw new DisallowedDestException(
+                    string.Join(" ", tokens),
+                    $"Missing or invalid destination argument at position {pos} for command: {string.Join(" ", tokens)}");
+            }
 
             string dest = args[actualIdx];
             if (!ValidateDestination(dest, allowedDestinations))
@@ -107,11 +111,14 @@ public static class ShellValidator
         ArgumentNullException.ThrowIfNull(allowedPatterns);
 
         string normalizedDest = NormalizeDestination(destination);
+        StringComparison comparison = OperatingSystem.IsWindows()
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
 
         foreach (string pattern in allowedPatterns)
         {
             string normalizedPattern = NormalizeDestination(pattern);
-            if (normalizedDest.StartsWith(normalizedPattern, StringComparison.Ordinal))
+            if (normalizedDest.StartsWith(normalizedPattern, comparison))
                 return true;
         }
 
@@ -164,13 +171,27 @@ public static class ShellValidator
         // Windows-style expansion: %VAR%
         string expanded = Environment.ExpandEnvironmentVariables(input);
 
-        // Unix-style expansion: $VAR or ${VAR}
-        // Match $VAR or ${VAR} but not $$ (which is literal $)
-        expanded = Regex.Replace(expanded, @"\$\{([A-Za-z_][A-Za-z0-9_]*)\}|\$([A-Za-z_][A-Za-z0-9_]*)", match =>
+        // PowerShell-style expansion: $env:VAR or ${env:VAR}
+        expanded = Regex.Replace(expanded, @"\$\{env:([A-Za-z_][A-Za-z0-9_]*)\}|\$env:([A-Za-z_][A-Za-z0-9_]*)", match =>
         {
             string varName = match.Groups[1].Success ? match.Groups[1].Value : match.Groups[2].Value;
             return Environment.GetEnvironmentVariable(varName) ?? match.Value;
         });
+
+        // Protect escaped dollar signs so Unix-style expansion does not match
+        // from the second '$' in sequences like $$HOME.
+        const string escapedDollarPlaceholder = "\u0000ESCAPED_DOLLAR\u0000";
+        expanded = expanded.Replace("$$", escapedDollarPlaceholder);
+
+        // Unix-style expansion: $VAR or ${VAR}
+        expanded = Regex.Replace(expanded, @"(?<!\$)\$\{([A-Za-z_][A-Za-z0-9_]*)\}|(?<!\$)\$([A-Za-z_][A-Za-z0-9_]*)", match =>
+        {
+            string varName = match.Groups[1].Success ? match.Groups[1].Value : match.Groups[2].Value;
+            return Environment.GetEnvironmentVariable(varName) ?? match.Value;
+        });
+
+        // Restore escaped dollar signs as literal dollars.
+        expanded = expanded.Replace(escapedDollarPlaceholder, "$");
 
         return expanded;
     }

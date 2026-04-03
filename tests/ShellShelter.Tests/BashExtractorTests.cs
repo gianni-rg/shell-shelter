@@ -41,8 +41,9 @@ public sealed class BashExtractorTests
                 RedirectStandardError = true,
                 UseShellExecute = false,
             });
-            proc?.WaitForExit(5000);
-            return true;
+            return proc is not null
+                && proc.WaitForExit(5000)
+                && proc.ExitCode == 0;
         }
         catch { return false; }
     }

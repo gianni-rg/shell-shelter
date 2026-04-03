@@ -78,18 +78,7 @@ public static class BashRunner
     /// </summary>
     private static (int ExitCode, string Output) RunInternal(string cmd, string bashPath, bool throwOnError)
     {
-        using var process = new Process
-        {
-            StartInfo = new ProcessStartInfo
-            {
-                FileName = bashPath,
-                Arguments = $"-c \"{EscapeBashArg(cmd)}\"",
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            }
-        };
+        using var process = CreateBashCommandProcess(cmd, bashPath);
 
         process.Start();
         string stdout = process.StandardOutput.ReadToEnd();
@@ -113,18 +102,7 @@ public static class BashRunner
         string bashPath,
         bool throwOnError)
     {
-        using var process = new Process
-        {
-            StartInfo = new ProcessStartInfo
-            {
-                FileName = bashPath,
-                Arguments = $"-c \"{EscapeBashArg(cmd)}\"",
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            }
-        };
+        using var process = CreateBashCommandProcess(cmd, bashPath);
 
         process.Start();
         var stdoutTask = process.StandardOutput.ReadToEndAsync();
@@ -156,18 +134,7 @@ public static class BashRunner
     {
         ArgumentNullException.ThrowIfNull(cmd);
 
-        using var process = new Process
-        {
-            StartInfo = new ProcessStartInfo
-            {
-                FileName = bashPath,
-                Arguments = $"-c {EscapeBashArg(cmd)}",
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            }
-        };
+        using var process = CreateBashCommandProcess(cmd, bashPath);
 
         process.Start();
         var stdoutTask = process.StandardOutput.ReadToEndAsync();
@@ -220,15 +187,22 @@ public static class BashRunner
         return (process.ExitCode, await stdoutTask, await stderrTask);
     }
 
-    /// <summary>
-    /// Escapes a string for safe use as a bash argument.
-    /// </summary>
-    /// <remarks>
-    /// This uses single-quote escaping for maximum safety: replaces ' with '\''
-    /// (end quote, escaped quote, start quote).
-    /// </remarks>
-    private static string EscapeBashArg(string arg)
+    private static Process CreateBashCommandProcess(string cmd, string bashPath)
     {
-        return "'" + arg.Replace("'", "'\\''") + "'";
+        var process = new Process
+        {
+            StartInfo = new ProcessStartInfo
+            {
+                FileName = bashPath,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            }
+        };
+
+        process.StartInfo.ArgumentList.Add("-c");
+        process.StartInfo.ArgumentList.Add(cmd);
+        return process;
     }
 }

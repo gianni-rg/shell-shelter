@@ -372,7 +372,7 @@ public sealed class BashExtractorTests
     }
 
     [Fact]
-    public void Extract_FindWithExecFlag_ExtractsNestedCommand()
+    public async Task Extract_FindWithExecFlag_ExtractsNestedCommand()
     {
         SkipIfShfmtMissing();
         var execFlags = new Dictionary<string, IReadOnlySet<string>>
@@ -381,9 +381,9 @@ public sealed class BashExtractorTests
             { "tar", new HashSet<string> { "--to-command", "-I" } }
         };
 
-        var result = BashExtractor.ExtractAsync(
+        var result = await BashExtractor.ExtractAsync(
             "find . -exec ls",
-            execFlags: execFlags).Result;
+            execFlags: execFlags);
 
         result.Commands.Select(c => c.ToList()).ToList().ShouldBe(
             new[] { new[] { "find", ".", "-exec", "ls" }, new[] { "ls" } }
@@ -391,7 +391,7 @@ public sealed class BashExtractorTests
     }
 
     [Fact]
-    public void Extract_FindWithExecAndSemicolon_ExtractsNestedCommand()
+    public async Task Extract_FindWithExecAndSemicolon_ExtractsNestedCommand()
     {
         SkipIfShfmtMissing();
         var execFlags = new Dictionary<string, IReadOnlySet<string>>
@@ -400,9 +400,9 @@ public sealed class BashExtractorTests
             { "tar", new HashSet<string> { "--to-command", "-I" } }
         };
 
-        var result = BashExtractor.ExtractAsync(
+        var result = await BashExtractor.ExtractAsync(
             "find . -exec rm -rf {} \\;",
-            execFlags: execFlags).Result;
+            execFlags: execFlags);
 
         var actualCmds = result.Commands.Select(c => c.ToList()).ToList();
         actualCmds.Count.ShouldBe(2);
@@ -411,7 +411,7 @@ public sealed class BashExtractorTests
     }
 
     [Fact]
-    public void Extract_CurlWithOutputFlag_ExtractsDestination()
+    public async Task Extract_CurlWithOutputFlag_ExtractsDestination()
     {
         SkipIfShfmtMissing();
         var destFlags = new Dictionary<string, IReadOnlySet<string>>
@@ -419,9 +419,9 @@ public sealed class BashExtractorTests
             { "curl", new HashSet<string> { "-o", "--output" } }
         };
 
-        var result = BashExtractor.ExtractAsync(
+        var result = await BashExtractor.ExtractAsync(
             "curl -o /tmp/out http://x",
-            destFlags: destFlags).Result;
+            destFlags: destFlags);
 
         result.Commands.Select(c => c.ToList()).ToList().ShouldBe(
             new[] { new[] { "curl", "-o", "/tmp/out", "http://x" } }
@@ -430,7 +430,7 @@ public sealed class BashExtractorTests
     }
 
     [Fact]
-    public void Extract_CurlWithLongOutputFlag_ExtractsDestination()
+    public async Task Extract_CurlWithLongOutputFlag_ExtractsDestination()
     {
         SkipIfShfmtMissing();
         var destFlags = new Dictionary<string, IReadOnlySet<string>>
@@ -438,15 +438,15 @@ public sealed class BashExtractorTests
             { "curl", new HashSet<string> { "-o", "--output" } }
         };
 
-        var result = BashExtractor.ExtractAsync(
+        var result = await BashExtractor.ExtractAsync(
             "curl --output file.txt http://x",
-            destFlags: destFlags).Result;
+            destFlags: destFlags);
 
         result.Redirects.ShouldBe(new[] { ("--output", "file.txt") });
     }
 
     [Fact]
-    public void Extract_ExWithDestPosition_ExtractsDestination()
+    public async Task Extract_ExWithDestPosition_ExtractsDestination()
     {
         SkipIfShfmtMissing();
         var destPos = new Dictionary<string, IReadOnlySet<int>>
@@ -457,9 +457,9 @@ public sealed class BashExtractorTests
             { "mv", new HashSet<int> { -1 } }
         };
 
-        var result = BashExtractor.ExtractAsync(
+        var result = await BashExtractor.ExtractAsync(
             "ex somefile",
-            destPos: destPos).Result;
+            destPos: destPos);
 
         result.Redirects.Count.ShouldBe(1);
         result.Redirects[0].Op.ShouldBe("0");
@@ -467,7 +467,7 @@ public sealed class BashExtractorTests
     }
 
     [Fact]
-    public void Extract_CpWithDestPosition_ExtractsLastArg()
+    public async Task Extract_CpWithDestPosition_ExtractsLastArg()
     {
         SkipIfShfmtMissing();
         var destPos = new Dictionary<string, IReadOnlySet<int>>
@@ -478,9 +478,9 @@ public sealed class BashExtractorTests
             { "mv", new HashSet<int> { -1 } }
         };
 
-        var result = BashExtractor.ExtractAsync(
+        var result = await BashExtractor.ExtractAsync(
             "cp src.txt dest.txt",
-            destPos: destPos).Result;
+            destPos: destPos);
 
         result.Redirects.Count.ShouldBe(1);
         result.Redirects[0].Op.ShouldBe("-1");
@@ -488,7 +488,7 @@ public sealed class BashExtractorTests
     }
 
     [Fact]
-    public void Extract_EnvWithExecPosition_ExtractsNestedCommand()
+    public async Task Extract_EnvWithExecPosition_ExtractsNestedCommand()
     {
         SkipIfShfmtMissing();
         var execPos = new Dictionary<string, IReadOnlySet<int>>
@@ -497,9 +497,9 @@ public sealed class BashExtractorTests
             { "xargs", new HashSet<int> { 0 } }
         };
 
-        var result = BashExtractor.ExtractAsync(
+        var result = await BashExtractor.ExtractAsync(
             "env ls -la",
-            execPos: execPos).Result;
+            execPos: execPos);
 
         var actualCmds = result.Commands.Select(c => c.ToList()).ToList();
         actualCmds.Count.ShouldBe(2);
@@ -508,7 +508,7 @@ public sealed class BashExtractorTests
     }
 
     [Fact]
-    public void Extract_XargsWithExecPosition_ExtractsNestedCommand()
+    public async Task Extract_XargsWithExecPosition_ExtractsNestedCommand()
     {
         SkipIfShfmtMissing();
         var execPos = new Dictionary<string, IReadOnlySet<int>>
@@ -517,9 +517,9 @@ public sealed class BashExtractorTests
             { "xargs", new HashSet<int> { 0 } }
         };
 
-        var result = BashExtractor.ExtractAsync(
+        var result = await BashExtractor.ExtractAsync(
             "xargs grep pattern",
-            execPos: execPos).Result;
+            execPos: execPos);
 
         var actualCmds = result.Commands.Select(c => c.ToList()).ToList();
         actualCmds.Count.ShouldBe(2);

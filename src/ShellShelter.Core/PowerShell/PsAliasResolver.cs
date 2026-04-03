@@ -11,6 +11,8 @@ namespace ShellShelter.Core.PowerShell;
 /// </remarks>
 public static class PsAliasResolver
 {
+    private const string RemoveItem = "Remove-Item";
+
     // Source: https://docs.microsoft.com/powershell/module/microsoft.powershell.core/about/about_aliases
     // and the output of `Get-Alias` on PS 7.4.
     private static readonly Dictionary<string, string> Aliases = new(StringComparer.OrdinalIgnoreCase)
@@ -41,12 +43,12 @@ public static class PsAliasResolver
         { "mv",       "Move-Item" },
         { "move",     "Move-Item" },
         { "mi",       "Move-Item" },
-        { "rm",       "Remove-Item" },
-        { "del",      "Remove-Item" },
-        { "erase",    "Remove-Item" },
-        { "rd",       "Remove-Item" },
-        { "ri",       "Remove-Item" },
-        { "rmdir",    "Remove-Item" },
+        { "rm",       RemoveItem },
+        { "del",      RemoveItem },
+        { "erase",    RemoveItem },
+        { "rd",       RemoveItem },
+        { "ri",       RemoveItem },
+        { "rmdir",    RemoveItem },
         { "md",       "mkdir" },
         { "ni",       "New-Item" },
 

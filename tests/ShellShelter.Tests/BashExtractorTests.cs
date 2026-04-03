@@ -386,7 +386,7 @@ public sealed class BashExtractorTests
             "find . -exec ls",
             execFlags: execFlags);
 
-        result.Commands.Select(c => c.ToList()).ToList().ShouldBe(
+        result.Commands.Select(c => c.ToList()).ShouldBe(
             new[] { new[] { "find", ".", "-exec", "ls" }, new[] { "ls" } }
                 .Select(c => (IReadOnlyList<string>)c.ToList()).ToList());
     }
@@ -424,7 +424,7 @@ public sealed class BashExtractorTests
             "curl -o /tmp/out http://x",
             destFlags: destFlags);
 
-        result.Commands.Select(c => c.ToList()).ToList().ShouldBe(
+        result.Commands.Select(c => c.ToList()).ShouldBe(
             new[] { new[] { "curl", "-o", "/tmp/out", "http://x" } }
                 .Select(c => (IReadOnlyList<string>)c.ToList()).ToList());
         result.Redirects.ShouldBe(new[] { ("-o", "/tmp/out") });

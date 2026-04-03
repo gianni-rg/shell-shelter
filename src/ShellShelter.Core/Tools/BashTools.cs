@@ -217,7 +217,7 @@ public static class BashTools
     {
         ArgumentNullException.ThrowIfNull(content);
 
-        string tmpPath = Path.GetTempFileName() + ".txt";
+        string tmpPath = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".txt");
         try
         {
             await File.WriteAllTextAsync(tmpPath, content);
@@ -260,17 +260,9 @@ public static class BashTools
             throw new ArgumentException("lineNumbers and quiet cannot be used together.");
 
         ShellPolicy policy = LoadBashPolicy();
-
-        // Validate the destination before building the command when inplace
-        if (inplace)
-        {
-            bool destAllowed = ShellValidator.ValidateDestination(path, policy.OkDests);
-            if (!destAllowed)
-            {
-                var denyEx = new DisallowedDestException(path);
-                return ToolResult.Denied(denyEx.Message, policy.OkCmds, policy.OkDests);
-            }
-        }
+        ToolResult? destinationValidationFailure = ValidateSedDestinationIfNeeded(path, inplace, policy);
+        if (destinationValidationFailure is not null)
+            return destinationValidationFailure;
 
         var flags = new StringBuilder();
         if (inplace)
@@ -293,15 +285,7 @@ public static class BashTools
         {
             string output = await BashShell.SafeRunAsync(bashCmd, sedPolicy);
 
-            if (lineNumbers)
-            {
-                string[] lines = inplace
-                    ? await File.ReadAllLinesAsync(path)
-                    : output.Split('\n');
-                int width = lines.Length.ToString().Length;
-                output = string.Join('\n',
-                    lines.Select((l, i) => $"{(i + 1).ToString().PadLeft(width)} {l}"));
-            }
+            output = await FormatSedOutputAsync(output, path, inplace, lineNumbers);
 
             return ToolResult.Success(output);
         }
@@ -380,49 +364,10 @@ public static class BashTools
 
             string cmdName = spec.Name[0];
 
-            if (spec.ExecFlags.Count > 0)
-            {
-                if (!execFlags.TryGetValue(cmdName, out var values))
-                {
-                    values = new HashSet<string>(StringComparer.Ordinal);
-                    execFlags[cmdName] = values;
-                }
-
-                values.UnionWith(spec.ExecFlags);
-            }
-
-            if (spec.DestFlags.Count > 0)
-            {
-                if (!destFlags.TryGetValue(cmdName, out var values))
-                {
-                    values = new HashSet<string>(StringComparer.Ordinal);
-                    destFlags[cmdName] = values;
-                }
-
-                values.UnionWith(spec.DestFlags);
-            }
-
-            if (spec.ExecPos.Count > 0)
-            {
-                if (!execPos.TryGetValue(cmdName, out var values))
-                {
-                    values = new HashSet<int>();
-                    execPos[cmdName] = values;
-                }
-
-                values.UnionWith(spec.ExecPos);
-            }
-
-            if (spec.DestPos.Count > 0)
-            {
-                if (!destPos.TryGetValue(cmdName, out var values))
-                {
-                    values = new HashSet<int>();
-                    destPos[cmdName] = values;
-                }
-
-                values.UnionWith(spec.DestPos);
-            }
+            AddStringMapValues(execFlags, cmdName, spec.ExecFlags);
+            AddStringMapValues(destFlags, cmdName, spec.DestFlags);
+            AddIntMapValues(execPos, cmdName, spec.ExecPos);
+            AddIntMapValues(destPos, cmdName, spec.DestPos);
         }
 
         return (
@@ -442,6 +387,65 @@ public static class BashTools
                 kvp => kvp.Key,
                 kvp => (IReadOnlySet<int>)kvp.Value,
                 StringComparer.Ordinal));
+    }
+
+    private static ToolResult? ValidateSedDestinationIfNeeded(string path, bool inplace, ShellPolicy policy)
+    {
+        if (!inplace)
+            return null;
+
+        if (ShellValidator.ValidateDestination(path, policy.OkDests))
+            return null;
+
+        var denyEx = new DisallowedDestException(path);
+        return ToolResult.Denied(denyEx.Message, policy.OkCmds, policy.OkDests);
+    }
+
+    private static async Task<string> FormatSedOutputAsync(string output, string path, bool inplace, bool lineNumbers)
+    {
+        if (!lineNumbers)
+            return output;
+
+        string[] lines = inplace
+            ? await File.ReadAllLinesAsync(path)
+            : output.Split('\n');
+        int width = lines.Length.ToString().Length;
+        return string.Join('\n',
+            lines.Select((line, index) => $"{(index + 1).ToString().PadLeft(width)} {line}"));
+    }
+
+    private static void AddStringMapValues(
+        IDictionary<string, HashSet<string>> map,
+        string key,
+        IReadOnlySet<string> values)
+    {
+        if (values.Count == 0)
+            return;
+
+        if (!map.TryGetValue(key, out var existing))
+        {
+            existing = new HashSet<string>(StringComparer.Ordinal);
+            map[key] = existing;
+        }
+
+        existing.UnionWith(values);
+    }
+
+    private static void AddIntMapValues(
+        IDictionary<string, HashSet<int>> map,
+        string key,
+        IReadOnlySet<int> values)
+    {
+        if (values.Count == 0)
+            return;
+
+        if (!map.TryGetValue(key, out var existing))
+        {
+            existing = new HashSet<int>();
+            map[key] = existing;
+        }
+
+        existing.UnionWith(values);
     }
 
     /// <summary>

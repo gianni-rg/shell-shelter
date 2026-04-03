@@ -124,7 +124,7 @@ public static class ShellValidator
         {
             for (int idx = 0; idx < args.Count; idx++)
             {
-                if (!TryGetDestinationForFlag(flag, args, idx, tokens, out string? destination))
+                if (!TryGetDestinationForFlag(flag, args, idx, tokens, out string destination))
                     continue;
 
                 if (!ValidateDestination(destination, allowedDestinations))
@@ -138,9 +138,9 @@ public static class ShellValidator
         IReadOnlyList<string> args,
         int idx,
         IReadOnlyList<string> tokens,
-        out string? destination)
+        out string destination)
     {
-        destination = null;
+        destination = string.Empty;
         string arg = args[idx];
 
         if (string.Equals(arg, flag, StringComparison.Ordinal))

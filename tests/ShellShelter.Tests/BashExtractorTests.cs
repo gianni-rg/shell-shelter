@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Shouldly;
 using ShellShelter.Core.Bash;
 
@@ -30,13 +31,38 @@ public sealed class BashExtractorTests
     /// <summary>
     /// Helper to assert extraction results match expected values (sync wrapper).
     /// </summary>
+    private static bool IsShfmtAvailable()
+    {
+        try
+        {
+            using var proc = Process.Start(new ProcessStartInfo("shfmt", "--version")
+            {
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+            });
+            proc?.WaitForExit(5000);
+            return true;
+        }
+        catch { return false; }
+    }
+
     private static void AssertExtraction(
         string cmd,
         IReadOnlyList<IReadOnlyList<string>> expectedCommands,
         IReadOnlySet<string>? expectedOps = null,
         IReadOnlyList<(string Op, string Dest)>? expectedRedirects = null)
     {
+        SkipIfShfmtMissing();
         AssertExtractionAsync(cmd, expectedCommands, expectedOps, expectedRedirects).Wait();
+    }
+
+    private static void SkipIfShfmtMissing()
+    {
+        if (!IsShfmtAvailable())
+            Assert.Skip(
+                "shfmt not found in PATH. Install: winget install mvdan.shfmt (Windows), " +
+                "brew install shfmt (macOS), apt-get install shfmt (Linux).");
     }
     [Fact]
     public void Extract_SimpleCommand_ReturnsCommand()
@@ -348,6 +374,7 @@ public sealed class BashExtractorTests
     [Fact]
     public void Extract_FindWithExecFlag_ExtractsNestedCommand()
     {
+        SkipIfShfmtMissing();
         var execFlags = new Dictionary<string, IReadOnlySet<string>>
         {
             { "find", new HashSet<string> { "-exec", "-execdir" } },
@@ -366,6 +393,7 @@ public sealed class BashExtractorTests
     [Fact]
     public void Extract_FindWithExecAndSemicolon_ExtractsNestedCommand()
     {
+        SkipIfShfmtMissing();
         var execFlags = new Dictionary<string, IReadOnlySet<string>>
         {
             { "find", new HashSet<string> { "-exec", "-execdir" } },
@@ -385,6 +413,7 @@ public sealed class BashExtractorTests
     [Fact]
     public void Extract_CurlWithOutputFlag_ExtractsDestination()
     {
+        SkipIfShfmtMissing();
         var destFlags = new Dictionary<string, IReadOnlySet<string>>
         {
             { "curl", new HashSet<string> { "-o", "--output" } }
@@ -403,6 +432,7 @@ public sealed class BashExtractorTests
     [Fact]
     public void Extract_CurlWithLongOutputFlag_ExtractsDestination()
     {
+        SkipIfShfmtMissing();
         var destFlags = new Dictionary<string, IReadOnlySet<string>>
         {
             { "curl", new HashSet<string> { "-o", "--output" } }
@@ -418,6 +448,7 @@ public sealed class BashExtractorTests
     [Fact]
     public void Extract_ExWithDestPosition_ExtractsDestination()
     {
+        SkipIfShfmtMissing();
         var destPos = new Dictionary<string, IReadOnlySet<int>>
         {
             { "ex", new HashSet<int> { 0 } },
@@ -438,6 +469,7 @@ public sealed class BashExtractorTests
     [Fact]
     public void Extract_CpWithDestPosition_ExtractsLastArg()
     {
+        SkipIfShfmtMissing();
         var destPos = new Dictionary<string, IReadOnlySet<int>>
         {
             { "ex", new HashSet<int> { 0 } },
@@ -458,6 +490,7 @@ public sealed class BashExtractorTests
     [Fact]
     public void Extract_EnvWithExecPosition_ExtractsNestedCommand()
     {
+        SkipIfShfmtMissing();
         var execPos = new Dictionary<string, IReadOnlySet<int>>
         {
             { "env", new HashSet<int> { 0 } },
@@ -477,6 +510,7 @@ public sealed class BashExtractorTests
     [Fact]
     public void Extract_XargsWithExecPosition_ExtractsNestedCommand()
     {
+        SkipIfShfmtMissing();
         var execPos = new Dictionary<string, IReadOnlySet<int>>
         {
             { "env", new HashSet<int> { 0 } },
@@ -496,6 +530,7 @@ public sealed class BashExtractorTests
     [Fact]
     public void Extract_UnhandledConstruct_ThrowsInvalidOperation()
     {
+        SkipIfShfmtMissing();
         // [[ -f foo ]] uses the TestExpression construct which is not handled
         Should.Throw<InvalidOperationException>(
             () => BashExtractor.ExtractAsync("[[ -f foo ]]").Result);
@@ -504,21 +539,22 @@ public sealed class BashExtractorTests
     [Fact]
     public void Extract_EmptyCommand_ThrowsArgumentNull()
     {
+        SkipIfShfmtMissing();
         Should.Throw<ArgumentNullException>(
             () => BashExtractor.ExtractAsync("").Result);
     }
 
     [Fact]
-    public void Extract_NullCommand_ThrowsArgumentNull()
+    public async Task Extract_NullCommand_ThrowsArgumentNull()
     {
-        Should.Throw<ArgumentNullException>(
-            () => BashExtractor.ExtractAsync(null!).Result);
+        await Should.ThrowAsync<ArgumentNullException>(
+            () => BashExtractor.ExtractAsync(null!));
     }
 
     [Fact]
-    public void Extract_ShfmtNotInPath_ThrowsFileNotFound()
+    public async Task Extract_ShfmtNotInPath_ThrowsFileNotFound()
     {
-        Should.Throw<FileNotFoundException>(
-            () => BashExtractor.ExtractAsync("echo hi", "/nonexistent/shfmt").Result);
+        await Should.ThrowAsync<FileNotFoundException>(
+            () => BashExtractor.ExtractAsync("echo hi", "/nonexistent/shfmt"));
     }
 }

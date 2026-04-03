@@ -145,6 +145,82 @@ public static class BashRunner
     }
 
     /// <summary>
+    /// Executes a bash command asynchronously and returns exit code with separate stdout and stderr.
+    /// </summary>
+    /// <param name="cmd">The bash command to execute (should be pre-validated).</param>
+    /// <param name="bashPath">Path to the bash executable. Defaults to "bash".</param>
+    /// <returns>A tuple of (exit code, stdout, stderr).</returns>
+    public static async Task<(int ExitCode, string StdOut, string StdErr)> RunWithSplitAsync(
+        string cmd,
+        string bashPath = BashDefault)
+    {
+        ArgumentNullException.ThrowIfNull(cmd);
+
+        using var process = new Process
+        {
+            StartInfo = new ProcessStartInfo
+            {
+                FileName = bashPath,
+                Arguments = $"-c {EscapeBashArg(cmd)}",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            }
+        };
+
+        process.Start();
+        var stdoutTask = process.StandardOutput.ReadToEndAsync();
+        var stderrTask = process.StandardError.ReadToEndAsync();
+        await Task.WhenAll(stdoutTask, stderrTask);
+        await process.WaitForExitAsync();
+
+        return (process.ExitCode, await stdoutTask, await stderrTask);
+    }
+
+    /// <summary>
+    /// Executes a multi-line bash script by piping it to bash via stdin.
+    /// </summary>
+    /// <remarks>
+    /// Preferred over <c>RunWithSplitAsync</c> for scripts that contain heredocs or newlines,
+    /// because no shell-quoting of the script body is needed.
+    /// </remarks>
+    /// <param name="script">The bash script to execute.</param>
+    /// <param name="bashPath">Path to the bash executable. Defaults to "bash".</param>
+    /// <returns>A tuple of (exit code, stdout, stderr).</returns>
+    public static async Task<(int ExitCode, string StdOut, string StdErr)> RunScriptAsync(
+        string script,
+        string bashPath = BashDefault)
+    {
+        ArgumentNullException.ThrowIfNull(script);
+
+        using var process = new Process
+        {
+            StartInfo = new ProcessStartInfo
+            {
+                FileName = bashPath,
+                RedirectStandardInput = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            }
+        };
+
+        process.Start();
+
+        await process.StandardInput.WriteAsync(script);
+        process.StandardInput.Close();
+
+        var stdoutTask = process.StandardOutput.ReadToEndAsync();
+        var stderrTask = process.StandardError.ReadToEndAsync();
+        await Task.WhenAll(stdoutTask, stderrTask);
+        await process.WaitForExitAsync();
+
+        return (process.ExitCode, await stdoutTask, await stderrTask);
+    }
+
+    /// <summary>
     /// Escapes a string for safe use as a bash argument.
     /// </summary>
     /// <remarks>

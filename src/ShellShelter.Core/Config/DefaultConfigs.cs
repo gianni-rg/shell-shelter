@@ -332,12 +332,98 @@ public static class DefaultConfigs
             },
             powershell = new
             {
-                okDests = Array.Empty<string>(),
-                okCmds = Array.Empty<string>(),
+                okDests = PsDefaultOkDests,
+                okCmds = PsDefaultOkCmds,
             },
         },
         new JsonSerializerOptions
         {
             WriteIndented = true,
         });
+
+    // ---------------------------------------------------------------------------
+    // PowerShell defaults
+    // ---------------------------------------------------------------------------
+
+    private static readonly string[] PsDefaultOkDests =
+    [
+        ".\\",
+        "$env:TEMP",
+        "/tmp",
+    ];
+
+    private static readonly string[] PsDefaultOkCmds =
+    [
+        // Navigation
+        "Get-ChildItem", "Get-Location", "Set-Location", "Push-Location", "Pop-Location",
+        // Content
+        "Get-Content", "Select-Object", "Where-Object", "ForEach-Object", "Sort-Object",
+        "Group-Object", "Measure-Object", "Compare-Object", "Select-String", "Get-Unique",
+        "Format-Table", "Format-List", "Format-Wide", "Format-Hex",
+        // System info
+        "Get-Process", "Get-Service", "Get-Date", "Get-Host", "Get-ComputerInfo",
+        "Get-EventLog", "Get-WinEvent",
+        // Environment
+        "Get-Variable", "Get-Alias", "Get-Command", "Get-Help", "Get-Member",
+        "Get-Module", "Get-PSProvider", "Get-PSDrive",
+        // Path
+        "Resolve-Path", "Split-Path", "Join-Path", "Test-Path", "Convert-Path",
+        // Web (read-only)
+        "Invoke-WebRequest", "Invoke-RestMethod",
+        // Output
+        "Write-Output", "Write-Host", "Write-Verbose", "Write-Debug",
+        "Out-String", "Out-Host", "Out-Null",
+        // Misc utilities
+        "Write-Output", "Clear-Host", "Start-Sleep",
+        // Git (read-only) — same git subcommands as bash defaults
+        "git blame", "git branch", "git cat-file", "git config --get", "git config --list",
+        "git describe", "git diff", "git log", "git ls-files", "git ls-tree", "git merge-base",
+        "git remote", "git rev-parse", "git shortlog", "git show", "git stash list", "git status", "git tag",
+        // Git (workspace)
+        "git fetch", "git add", "git commit", "git switch", "git checkout",
+        // gh (read-only)
+        "gh repo view", "gh issue list", "gh issue view", "gh pr list", "gh pr view",
+        "gh pr status", "gh pr checks", "gh pr diff",
+        "gh release list", "gh release view", "gh run list", "gh run view",
+        "gh workflow list", "gh workflow view",
+        "gh auth status", "gh gist list", "gh gist view", "gh browse", "gh search",
+        // dotnet (read-only)
+        "dotnet build", "dotnet test", "dotnet restore", "dotnet list package",
+        "dotnet list reference", "dotnet format --verify-no-changes",
+        // Tee (write dest validated)
+        "Tee-Object",
+    ];
+
+    /// <summary>
+    /// Gets the built-in PowerShell default INI configuration section.
+    /// </summary>
+    public const string PsDefaultIni = """
+        [POWERSHELL]
+        ok_dests = .\, $env:TEMP, /tmp
+
+        ok_cmds = Get-ChildItem, Get-Location, Set-Location, Push-Location, Pop-Location
+            Get-Content, Select-Object, Where-Object, ForEach-Object, Sort-Object
+            Group-Object, Measure-Object, Compare-Object, Select-String, Get-Unique
+            Format-Table, Format-List, Format-Wide, Format-Hex
+            Get-Process, Get-Service, Get-Date, Get-Host, Get-ComputerInfo
+            Get-EventLog, Get-WinEvent
+            Get-Variable, Get-Alias, Get-Command, Get-Help, Get-Member
+            Get-Module, Get-PSProvider, Get-PSDrive
+            Resolve-Path, Split-Path, Join-Path, Test-Path, Convert-Path
+            Invoke-WebRequest, Invoke-RestMethod
+            Write-Output, Write-Host, Write-Verbose, Write-Debug
+            Out-String, Out-Host, Out-Null, Clear-Host, Start-Sleep
+            git blame, git branch, git cat-file, git config --get, git config --list,
+            git describe, git diff, git log, git ls-files, git ls-tree, git merge-base,
+            git remote, git rev-parse, git shortlog, git show, git stash list, git status, git tag
+            git fetch, git add, git commit, git switch, git checkout
+            gh repo view, gh issue list, gh issue view, gh pr list, gh pr view,
+            gh pr status, gh pr checks, gh pr diff,
+            gh release list, gh release view, gh run list, gh run view,
+            gh workflow list, gh workflow view,
+            gh auth status, gh gist list, gh gist view, gh browse, gh search
+            dotnet build, dotnet test, dotnet restore, dotnet list package,
+            dotnet list reference, dotnet format --verify-no-changes
+            Tee-Object
+        """;
 }

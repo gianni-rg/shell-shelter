@@ -1,3 +1,5 @@
+using ShellShelter.Core;
+
 namespace ShellShelter.Core.Bash;
 
 /// <summary>
@@ -106,6 +108,30 @@ public static class BashShell
 
         // Execute if validation passed
         return await BashRunner.RunAsync(cmd, bashPath);
+    }
+
+    /// <summary>
+    /// Validates a bash script, then executes it via stdin-piped bash, returning split stdout/stderr.
+    /// </summary>
+    /// <remarks>
+    /// Intended for multi-line scripts (e.g. heredoc-based ex commands) where shell-quoting of
+    /// the entire body would be unsafe. The script is piped to bash via stdin rather than passed
+    /// as a <c>-c</c> argument so heredoc syntax is preserved without escaping.
+    /// </remarks>
+    /// <param name="script">The bash script to validate and execute.</param>
+    /// <param name="policy">The shell policy for validation.</param>
+    /// <param name="bashPath">Optional path to bash executable. Defaults to "bash".</param>
+    /// <returns>A tuple of (exit code, stdout, stderr).</returns>
+    public static async Task<(int ExitCode, string StdOut, string StdErr)> RunCapturedAsync(
+        string script,
+        ShellPolicy policy,
+        string bashPath = "bash")
+    {
+        ArgumentNullException.ThrowIfNull(script);
+        ArgumentNullException.ThrowIfNull(policy);
+
+        await ValidateAsync(script, policy);
+        return await BashRunner.RunScriptAsync(script, bashPath);
     }
 
     /// <summary>

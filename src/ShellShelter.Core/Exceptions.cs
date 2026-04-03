@@ -129,13 +129,14 @@ public sealed class ShfmtNotFoundException : FileNotFoundException
 /// </summary>
 public sealed class PwshNotFoundException : FileNotFoundException
 {
+    private const string DefaultMessage =
+        "The 'pwsh' executable was not found in PATH. Install PowerShell Core before using PowerShell execution features.";
+
     /// <summary>
     /// Initializes a new instance of the <see cref="PwshNotFoundException"/> class.
     /// </summary>
     public PwshNotFoundException()
-        : base(
-            "The 'pwsh' executable was not found in PATH. Install PowerShell Core before using PowerShell execution features.",
-            "pwsh")
+        : base(DefaultMessage, "pwsh")
     {
     }
 
@@ -145,6 +146,18 @@ public sealed class PwshNotFoundException : FileNotFoundException
     /// <param name="message">The exception message.</param>
     public PwshNotFoundException(string message)
         : base(message, "pwsh")
+    {
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="PwshNotFoundException"/> class with the
+    /// executable path, an optional hint, and an optional inner exception.
+    /// </summary>
+    /// <param name="pwshPath">The path (or name) of the pwsh executable that was not found.</param>
+    /// <param name="hint">An optional human-readable install hint appended to the default message.</param>
+    /// <param name="innerException">An optional inner exception.</param>
+    public PwshNotFoundException(string pwshPath, string? hint = null, Exception? innerException = null)
+        : base(hint ?? DefaultMessage, pwshPath, innerException)
     {
     }
 }

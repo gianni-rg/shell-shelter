@@ -11,7 +11,7 @@ namespace ShellShelter.Core.Bash;
 /// all executable commands, operators, and destination redirects. It handles recursive
 /// command extraction for nested commands via exec flags and positions.
 /// </remarks>
-public sealed class BashExtractor
+public sealed class BashExtractor : IShellExtractor
 {
     private const string ShfmtDefault = "shfmt";
     private const string HandledTypesSetJson = """
@@ -538,6 +538,13 @@ public sealed class BashExtractor
 
         return new ExtractionResult(commands, ops, redirects);
     }
+
+    /// <summary>
+    /// Implements <see cref="IShellExtractor.ExtractAsync"/> by delegating to the static overload
+    /// with default shfmt path and no flag/position overrides.
+    /// </summary>
+    Task<ExtractionResult> IShellExtractor.ExtractAsync(string cmd) =>
+        ExtractAsync(cmd);
 
     /// <summary>
     /// Checks if shfmt is available in the system PATH.

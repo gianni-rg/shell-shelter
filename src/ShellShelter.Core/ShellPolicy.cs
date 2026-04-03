@@ -41,6 +41,15 @@ public sealed class ShellPolicy
     }
 
     /// <summary>
+    /// Creates a cloned policy with additional commands and destinations parsed from comma-separated strings.
+    /// </summary>
+    /// <param name="addCmds">Comma-separated command spec strings to add (e.g. <c>"sed, ex:dest=$0"</c>).</param>
+    /// <param name="addDests">Comma-separated destination prefix strings to add (e.g. <c>"/tmp, ./"</c>).</param>
+    /// <returns>A cloned policy with the parsed specs added.</returns>
+    public ShellPolicy WithAdd(string? addCmds, string? addDests = null) =>
+        WithAdd(ParseCmds(addCmds), ParseDests(addDests));
+
+    /// <summary>
     /// Creates a cloned policy with command specs and destination prefixes removed.
     /// </summary>
     /// <param name="removeCmds">Command specs to remove.</param>
@@ -53,6 +62,24 @@ public sealed class ShellPolicy
         RemoveDestinationValues(clone.OkDests, removeDests);
         return clone;
     }
+
+    /// <summary>
+    /// Creates a cloned policy with commands and destinations parsed from comma-separated strings removed.
+    /// </summary>
+    /// <param name="removeCmds">Comma-separated command names to remove (e.g. <c>"rm, mv"</c>).</param>
+    /// <param name="removeDests">Comma-separated destination prefixes to remove (e.g. <c>"/tmp"</c>).</param>
+    /// <returns>A cloned policy with the parsed entries removed.</returns>
+    public ShellPolicy WithRemove(string? removeCmds, string? removeDests = null) =>
+        WithRemove(ParseCmds(removeCmds), ParseDests(removeDests));
+
+    private static IEnumerable<CmdSpec>? ParseCmds(string? csv) =>
+        csv is null ? null :
+            csv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+               .Select(CmdSpec.FromStr);
+
+    private static IEnumerable<string>? ParseDests(string? csv) =>
+        csv is null ? null :
+            csv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
     private ShellPolicy Clone()
     {

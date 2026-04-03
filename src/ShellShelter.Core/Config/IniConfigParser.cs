@@ -21,19 +21,28 @@ public sealed class IniConfigParser
             throw new ArgumentException("INI content cannot be null or whitespace.", nameof(ini));
         }
 
-        Dictionary<string, List<string>> defaults = ParseDefaultSection(ini);
+        Dictionary<string, List<string>> defaults = ParseSection(ini, "DEFAULT");
         string okDestsValue = GetJoinedValue(defaults, "ok_dests") ?? DefaultOkDests;
         string okCmdsValue = GetJoinedValue(defaults, "ok_cmds")
             ?? throw new KeyNotFoundException("The [DEFAULT] section must define 'ok_cmds'.");
 
         string splitCmds = string.Join(",", okCmdsValue.Split(["\r\n", "\n"], StringSplitOptions.None));
 
+        Dictionary<string, List<string>> psSection = ParseSection(ini, "POWERSHELL");
+        string psOkDestsValue = GetJoinedValue(psSection, "ok_dests") ?? string.Empty;
+        string psOkCmdsValue = GetJoinedValue(psSection, "ok_cmds") ?? string.Empty;
+        string psSplitCmds = string.Join(",", psOkCmdsValue.Split(["\r\n", "\n"], StringSplitOptions.None));
+
+        ShellPolicy psPolicy = string.IsNullOrWhiteSpace(psOkCmdsValue)
+            ? new ShellPolicy()
+            : new ShellPolicy(SplitSpecs(psSplitCmds), SplitSet(psOkDestsValue));
+
         return new ShellPolicyPair(
             new ShellPolicy(SplitSpecs(splitCmds), SplitSet(okDestsValue)),
-            new ShellPolicy());
+            psPolicy);
     }
 
-    private static Dictionary<string, List<string>> ParseDefaultSection(string ini)
+    private static Dictionary<string, List<string>> ParseSection(string ini, string sectionName)
     {
         Dictionary<string, List<string>> values = new(StringComparer.OrdinalIgnoreCase);
         using StringReader reader = new(ini);
@@ -61,7 +70,7 @@ public sealed class IniConfigParser
                 continue;
             }
 
-            if (!string.Equals(currentSection, "DEFAULT", StringComparison.OrdinalIgnoreCase))
+            if (!string.Equals(currentSection, sectionName, StringComparison.OrdinalIgnoreCase))
             {
                 continue;
             }

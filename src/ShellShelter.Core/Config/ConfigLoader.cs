@@ -28,6 +28,32 @@ public sealed class ConfigLoader
     }
 
     /// <summary>
+    /// Returns the default configuration file path for the current platform.
+    /// </summary>
+    /// <remarks>
+    /// On Windows: <c>%APPDATA%\ShellShelter\config.json</c>.<br/>
+    /// On Unix: <c>$XDG_CONFIG_HOME/shellshelter/config.json</c>,
+    /// defaulting to <c>~/.config/shellshelter/config.json</c>.
+    /// </remarks>
+    public static string GetDefaultConfigPath()
+    {
+        string configDir;
+        if (OperatingSystem.IsWindows())
+        {
+            string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            configDir = Path.Combine(appData, "ShellShelter");
+        }
+        else
+        {
+            string xdg = Environment.GetEnvironmentVariable("XDG_CONFIG_HOME")
+                ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".config");
+            configDir = Path.Combine(xdg, "shellshelter");
+        }
+
+        return Path.Combine(configDir, "config.json");
+    }
+
+    /// <summary>
     /// Loads a configuration file from disk.
     /// </summary>
     /// <param name="path">The configuration file path.</param>

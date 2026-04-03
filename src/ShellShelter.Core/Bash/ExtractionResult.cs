@@ -1,4 +1,4 @@
-namespace ShellShelter.Core.Bash;
+namespace ShellShelter.Core;
 
 /// <summary>
 /// Represents the result of extracting commands from a bash command string.

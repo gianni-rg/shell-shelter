@@ -1,9 +1,14 @@
-# shell-shelter
+# ShellShelter
 
-ShellShelter is a .NET allowlist engine for shell commands.
+ShellShelter is a .NET allowlist engine for shell commands, available as a CLI tool and a C# library.
 
-It validates extracted commands and write destinations before execution, with first-class support
-for both Bash and PowerShell.
+It provides a safe interface to run shell commands from untrusted sources, such as user input, configuration files, or LLM-generated content, by validating them against a customizable allowlist of safe commands and write destinations. *Extracted commands* and *write destinations* are validated **before** execution, with first-class support for both Bash and PowerShell.
+
+> It is an early-stage experimental project. **It is not yet stable and/or production-ready.** The tool is functional, but it is still under active development, debugging, and testing. Data loss, corruption, or unexpected behaviors may occur. *Use it at your own risk*.
+
+The approach is inspired by [SafeCmd](https://answerdotai.github.io/safecmd/) by Answer.AI, which solves the problem of running shell commands from untrusted sources by validating bash commands against an allowlist before execution. Instead of trying to blacklist dangerous patterns (which is error-prone and easy to bypass), it uses a generous allowlist of read-only and easily-reverted commands that are safe to run.
+
+ShellShelter is a more general and extensible implementation of the same concept, with support for both Bash and PowerShell, a shared policy engine, and a C# API for easy integration in .NET applications. The inherited innovation is that commands are validated using a syntax parser to build an Abstract Syntax Tree (AST) of each command, better handling complex syntax pipelines, command substitutions, sub-commands, sub-shells, and validating every command, even nested ones, before anything executes.
 
 ## Features
 
@@ -102,3 +107,23 @@ See detailed docs:
 
 - [docs/config-guide.md](docs/config-guide.md)
 - [docs/powershell-guide.md](docs/powershell-guide.md)
+
+## Acknowledgements
+
+Inspired by [Answer.AI's SafeCmd](https://answerdotai.github.io/safecmd/), a helper tool that solves the problem of running shell commands from untrusted sources by validating bash commands against an allowlist before execution.
+
+## Contribution
+
+The project is constantly evolving and contributions are warmly welcomed.
+
+I'm more than happy to receive any kind of contribution to this experimental project: from helpful feedbacks to bug reports, documentation, usage examples, feature requests, or directly code contribution for bug fixes and new and/or improved features.
+
+Feel free to file issues and pull requests on the repository and I'll address them as much as I can, *with a best effort approach during my spare time*. DO NOT expect a super fast turnaround, but I'll do my best to keep the project active and responsive.
+
+> Development is mainly done on Windows, but cross-platform support should be improved. Help improving and validating non-Windows environments is very welcome.
+
+## License
+
+This project is licensed under the [Apache License 2.0](./LICENSE).
+
+Copyright © 2026 Gianni Rosa Gallina.

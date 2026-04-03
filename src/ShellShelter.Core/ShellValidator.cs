@@ -128,7 +128,7 @@ public static class ShellValidator
             if (actualIdx < 0 || actualIdx >= args.Count)
             {
                 throw new DisallowedDestException(
-                    string.Join(" ", tokens),
+                    "<missing>",
                     $"Missing or invalid destination argument at position {pos} for command: {string.Join(" ", tokens)}");
             }
 
@@ -188,7 +188,7 @@ public static class ShellValidator
             if (destIdx >= args.Count)
             {
                 throw new DisallowedDestException(
-                    string.Join(" ", tokens),
+                    "<missing>",
                     $"Missing destination argument after flag {flag} for command: {string.Join(" ", tokens)}");
             }
 
@@ -203,7 +203,7 @@ public static class ShellValidator
             if (string.IsNullOrWhiteSpace(equalsValue))
             {
                 throw new DisallowedDestException(
-                    string.Join(" ", tokens),
+                    "<missing>",
                     $"Missing destination value for flag {flag} in command: {string.Join(" ", tokens)}");
             }
 
@@ -220,7 +220,7 @@ public static class ShellValidator
                 if (string.IsNullOrWhiteSpace(colonValue))
                 {
                     throw new DisallowedDestException(
-                        string.Join(" ", tokens),
+                        "<missing>",
                         $"Missing destination value for flag {flag} in command: {string.Join(" ", tokens)}");
                 }
 

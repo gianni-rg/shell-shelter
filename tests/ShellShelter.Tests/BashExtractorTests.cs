@@ -601,4 +601,56 @@ public sealed class BashExtractorTests
         await Should.ThrowAsync<FileNotFoundException>(
             () => BashExtractor.ExtractAsync("echo hi", "/nonexistent/shfmt"));
     }
+
+    // Round-4 PR #1 comment: UsesLegacyOperatorCodes was too narrow — it only checked for
+    // codes exclusively in the legacy set. Codes that are shared between maps but have
+    // DIFFERENT meanings (e.g. 12 = '|' in legacy vs '||' in new) can also appear in a
+    // legacy-only AST and must be mapped correctly. These tests directly assert that the
+    // opcode tables and TryMapOperatorCode resolve the correct string for each mode.
+
+    [Theory]
+    [InlineData(12, true,  "|")]   // shared code: legacy meaning = pipe
+    [InlineData(12, false, "||")]  // shared code: new meaning = logical OR
+    [InlineData(11, true,  "||")]  // shared code: legacy meaning = logical OR
+    [InlineData(11, false, "&&")]  // shared code: new meaning = logical AND
+    [InlineData(13, true,  "|&")]  // shared code: legacy meaning = pipe-with-stderr
+    [InlineData(13, false, "|")]   // shared code: new meaning = pipe
+    public void TryMapOperatorCode_SharedOpcode_MapsAccordingToMode(int code, bool legacy, string expected)
+    {
+        bool found = BashExtractor.TryMapOperatorCode(code, legacy, out string op);
+
+        found.ShouldBeTrue();
+        op.ShouldBe(expected);
+    }
+
+    [Theory]
+    [InlineData(10, "&&")]  // legacy-only: logical AND
+    [InlineData(54, ">")]   // legacy-only: redirect out
+    [InlineData(55, ">>")]  // legacy-only: redirect out append
+    public void TryMapOperatorCode_LegacyOnlyOpcode_FoundInLegacyMapOnly(int code, string expected)
+    {
+        bool legacy_found = BashExtractor.TryMapOperatorCode(code, useLegacyOpCodes: true, out string legacyOp);
+        bool new_found    = BashExtractor.TryMapOperatorCode(code, useLegacyOpCodes: false, out _);
+
+        legacy_found.ShouldBeTrue();
+        legacyOp.ShouldBe(expected);
+        new_found.ShouldBeFalse();
+    }
+
+    [Theory]
+    [InlineData(14,  "|&")]  // new-only: pipe-with-stderr
+    [InlineData(63,  ">")]   // new-only: redirect out
+    [InlineData(67,  "<&")]  // new-only: fd dup read
+    [InlineData(68,  ">&")]  // new-only: fd dup write
+    [InlineData(74,  "&>")]  // new-only: redirect stdout+stderr
+    [InlineData(76,  "&>>")] // new-only: redirect stdout+stderr append
+    public void TryMapOperatorCode_NewOnlyOpcode_FoundInNewMapOnly(int code, string expected)
+    {
+        bool new_found    = BashExtractor.TryMapOperatorCode(code, useLegacyOpCodes: false, out string newOp);
+        bool legacy_found = BashExtractor.TryMapOperatorCode(code, useLegacyOpCodes: true, out _);
+
+        new_found.ShouldBeTrue();
+        newOp.ShouldBe(expected);
+        legacy_found.ShouldBeFalse();
+    }
 }

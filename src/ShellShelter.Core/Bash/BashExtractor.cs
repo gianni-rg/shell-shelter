@@ -535,6 +535,18 @@ public sealed class BashExtractor : IShellExtractor
     {
         var opCodes = new HashSet<int>();
         CollectOpCodes(node, opCodes);
+
+        // Codes present in OpMapNew but NOT in OpMapLegacy: if any appear, the AST is
+        // definitively produced by a newer shfmt build.
+        if (opCodes.Overlaps([14, 63, 67, 68, 74, 76]))
+            return false;
+
+        // Codes present in OpMapLegacy but NOT in OpMapNew: if any appear, the AST is
+        // definitively produced by a legacy shfmt build.
+        // NOTE: some codes (11,12,13,64,65) exist in BOTH maps with different meanings.
+        // If an AST contains only shared codes (e.g. only '|'=12 or '&&'=11), we cannot
+        // distinguish the two formats by opcode alone and conservatively treat it as new,
+        // which is correct for shfmt v3+ (the current minimum supported version).
         return opCodes.Overlaps([10, 54, 55, 56, 58, 59]);
     }
 

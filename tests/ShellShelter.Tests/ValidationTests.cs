@@ -247,6 +247,85 @@ public sealed class ValidationTests
         Should.NotThrow(() => ShellValidator.Validate(extraction, policy));
     }
 
+    // Round-4 PR #1 comment: DisallowedDestException.Destination must never be a raw command
+    // string for missing-destination scenarios; the stable placeholder "<missing>" is used instead.
+
+    [Fact]
+    public void ValidateDestinationArgs_MissingPositionalDest_DestinationIsPlaceholder()
+    {
+        // cp spec with dest at positional index 1 (second arg after command name).
+        // Supplying only one arg makes the index out of range.
+        var policy = new ShellPolicy(
+            okCmds: [new CmdSpec("cp", destPos: [1])],
+            okDests: ["./", "/tmp"]);
+
+        var extraction = new ExtractionResult(
+            new[] { new[] { "cp", "source-only" }.AsReadOnly() }.AsReadOnly(),
+            new HashSet<string>(),
+            new List<(string, string)>());
+
+        var ex = Should.Throw<DisallowedDestException>(() => ShellValidator.Validate(extraction, policy));
+        ex.Destination.ShouldBe("<missing>");
+        ex.Message.ShouldContain("cp");
+    }
+
+    [Fact]
+    public void ValidateDestinationArgs_MissingFlagValueSpaceForm_DestinationIsPlaceholder()
+    {
+        // curl -o with no path following it.
+        var policy = new ShellPolicy(
+            okCmds: [new CmdSpec("curl", destFlags: ["-o"])],
+            okDests: ["./", "/tmp"]);
+
+        var extraction = new ExtractionResult(
+            new[] { new[] { "curl", "-o" }.AsReadOnly() }.AsReadOnly(),
+            new HashSet<string>(),
+            new List<(string, string)>());
+
+        var ex = Should.Throw<DisallowedDestException>(() => ShellValidator.Validate(extraction, policy));
+        ex.Destination.ShouldBe("<missing>");
+        ex.Message.ShouldContain("-o");
+    }
+
+    [Fact]
+    public void ValidateDestinationArgs_MissingFlagValueEqualsForm_DestinationIsPlaceholder()
+    {
+        // -o= with an empty value after the equals sign.
+        var policy = new ShellPolicy(
+            okCmds: [new CmdSpec("curl", destFlags: ["-o"])],
+            okDests: ["./", "/tmp"]);
+
+        var extraction = new ExtractionResult(
+            new[] { new[] { "curl", "-o=" }.AsReadOnly() }.AsReadOnly(),
+            new HashSet<string>(),
+            new List<(string, string)>());
+
+        var ex = Should.Throw<DisallowedDestException>(() => ShellValidator.Validate(extraction, policy));
+        ex.Destination.ShouldBe("<missing>");
+        ex.Message.ShouldContain("-o");
+    }
+
+    [Fact]
+    public void ValidateDestinationArgs_MissingFlagValueColonForm_DestinationIsPlaceholder()
+    {
+        // PowerShell-style -FilePath: with empty value after the colon.
+        var policy = new ShellPolicy(
+            okCmds: [new CmdSpec("Tee-Object", destFlags: ["-FilePath"])],
+            okDests: ["./", "/tmp"]);
+
+        var extraction = new ExtractionResult(
+            new[] { new[] { "Tee-Object", "-FilePath:" }.AsReadOnly() }.AsReadOnly(),
+            new HashSet<string>(),
+            new List<(string, string)>());
+
+        var ex = Should.Throw<DisallowedDestException>(() =>
+            ShellValidator.Validate(extraction, policy,
+                destinationFlagNamesCaseInsensitive: true,
+                allowPowerShellFlagColonAssignment: true));
+        ex.Destination.ShouldBe("<missing>");
+        ex.Message.ShouldContain("-FilePath");
+    }
+
     [Fact]
     public void ValidateDestination_SymlinkEscapesAllowlist_ReturnsFalse()
     {

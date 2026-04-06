@@ -1,4 +1,4 @@
-﻿using ShellShelter.Core;
+using ShellShelter.Core;
 using ShellShelter.Core.Bash;
 using ShellShelter.Core.Config;
 using ShellShelter.Core.PowerShell;
@@ -28,20 +28,20 @@ try
     switch (subcommand)
     {
         case "bash":
-        {
-            ShellPolicy policy = LoadBashPolicy(loader);
-            string output = await BashShell.SafeRunAsync(cmd, policy);
-            Console.Write(output);
-            return 0;
-        }
+            {
+                ShellPolicy policy = LoadBashPolicy(loader);
+                string output = await BashShell.SafeRunAsync(cmd, policy);
+                Console.Write(output);
+                return 0;
+            }
 
         case "pwsh":
-        {
-            ShellPolicy policy = LoadPsPolicy(loader);
-            string output = await PsShell.SafeRunAsync(cmd, policy);
-            Console.Write(output);
-            return 0;
-        }
+            {
+                ShellPolicy policy = LoadPsPolicy(loader);
+                string output = await PsShell.SafeRunAsync(cmd, policy);
+                Console.Write(output);
+                return 0;
+            }
 
         case "config" when args.Length >= 2 && args[1].Equals("path", StringComparison.OrdinalIgnoreCase):
             Console.WriteLine(ConfigLoader.GetDefaultConfigPath());

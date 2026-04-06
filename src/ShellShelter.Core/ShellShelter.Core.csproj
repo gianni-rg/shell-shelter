@@ -2,4 +2,14 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.PowerShell.SDK" Version="7.5.0" />
   </ItemGroup>
+
+  <PropertyGroup>
+    <PackageId>ShellShelter.Core</PackageId>
+    <Description>.NET allowlist engine for validating and safely running shell commands from untrusted input.</Description>
+    <Authors>Gianni Rosa Gallina</Authors>
+    <RepositoryUrl>https://github.com/gianni-rg/shell-shelter</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/gianni-rg/shell-shelter</PackageProjectUrl>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+    <PackageTags>shell;security;allowlist;powershell;bash</PackageTags>
+  </PropertyGroup>
 </Project>

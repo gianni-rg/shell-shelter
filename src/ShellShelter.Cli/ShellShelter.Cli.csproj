@@ -4,5 +4,6 @@
   </ItemGroup>
   <PropertyGroup>
     <OutputType>Exe</OutputType>
+    <AssemblyName>shellshelter</AssemblyName>
   </PropertyGroup>
 </Project>

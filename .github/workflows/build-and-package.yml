@@ -43,12 +43,12 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
       - name: Setup .NET SDK
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
@@ -81,7 +81,7 @@ jobs:
 
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: test-results-${{ matrix.os }}
           path: TestResults/${{ matrix.os }}
@@ -94,10 +94,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup .NET SDK
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
@@ -114,11 +114,12 @@ jobs:
       version: ${{ steps.gitversion.outputs.semVer }}
       informational_version: ${{ steps.gitversion.outputs.informationalVersion }}
       is_release_tag: ${{ steps.version.outputs.is_release_tag }}
+      is_stable_release: ${{ steps.version.outputs.is_stable_release }}
       should_package: ${{ steps.version.outputs.should_package }}
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -138,16 +139,22 @@ jobs:
           set -euo pipefail
 
           is_release_tag=false
+          is_stable_release=false
           should_package=false
 
           if [[ '${{ github.ref_type }}' == 'tag' && '${{ github.ref_name }}' =~ ^v?[0-9]+\.[0-9]+\.[0-9]+([-.+][0-9A-Za-z.-]+)?$ ]]; then
             is_release_tag=true
           fi
 
+          if [[ '${{ github.ref_type }}' == 'tag' && '${{ github.ref_name }}' =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            is_stable_release=true
+          fi
+
           if [[ "${is_release_tag}" == "true" || '${{ github.event_name }}' == 'workflow_dispatch' ]]; then
             should_package=true
           fi
           echo "is_release_tag=${is_release_tag}" >> "$GITHUB_OUTPUT"
+          echo "is_stable_release=${is_stable_release}" >> "$GITHUB_OUTPUT"
           echo "should_package=${should_package}" >> "$GITHUB_OUTPUT"
           echo "Resolved semantic version: ${{ steps.gitversion.outputs.fullSemVer }}"
 
@@ -159,10 +166,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup .NET SDK
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
@@ -199,7 +206,7 @@ jobs:
           zip -q "shellshelter-${{ needs.resolve-version.outputs.version }}-win-x64.zip" shellshelter.exe
 
       - name: Upload CLI artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: shellshelter-cli-${{ needs.resolve-version.outputs.version }}
           path: artifacts/cli-package/shellshelter-${{ needs.resolve-version.outputs.version }}-win-x64.zip
@@ -212,10 +219,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup .NET SDK
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
@@ -240,7 +247,36 @@ jobs:
           /p:InformationalVersion=${{ needs.resolve-version.outputs.informational_version }}
 
       - name: Upload NuGet artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: shellshelter-core-${{ needs.resolve-version.outputs.version }}
           path: artifacts/nuget/*.nupkg
+
+  publish-packages:
+    name: Publish NuGet Package
+    runs-on: ubuntu-latest
+    needs: [validate, resolve-version, pack-core]
+    if: ${{ needs.resolve-version.outputs.is_stable_release == 'true' }}
+
+    steps:
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Download NuGet artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: shellshelter-core-${{ needs.resolve-version.outputs.version }}
+          path: artifacts/nuget
+
+      - name: Publish package to NuGet.org
+        shell: bash
+        run: |
+          set -euo pipefail
+          for package in artifacts/nuget/*.nupkg; do
+            dotnet nuget push "$package" \
+              --api-key "${{ secrets.NUGET_API_KEY }}" \
+              --source "https://api.nuget.org/v3/index.json" \
+              --skip-duplicate
+          done

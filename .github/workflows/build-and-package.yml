@@ -175,7 +175,7 @@ jobs:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
       - name: Restore
-        run: dotnet restore ShellShelter.sln -r win-x64
+        run: dotnet restore src/ShellShelter.Cli/ShellShelter.Cli.csproj -r win-x64
 
       - name: Publish CLI
         run: >-

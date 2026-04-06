@@ -221,7 +221,7 @@ public sealed class BashExtractor : IShellExtractor
         foreach (var stmt in stmts.Where(s => s.ValueKind == JsonValueKind.Object))
         {
             VisitNode(stmt, originalCmd, commands);
-            
+
             // Handle redirects attached to this statement
             var redirects = stmt.GetPropertyOrNull("Redirs")?.EnumerateArrayOrEmpty() ?? Enumerable.Empty<JsonElement>();
             foreach (var redirect in redirects.Where(r => r.ValueKind == JsonValueKind.Object))

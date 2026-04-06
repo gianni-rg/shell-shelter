@@ -11,7 +11,7 @@ public sealed class ValidationTests
     private static ShellPolicy GetDefaultPolicy()
     {
         var policy = new ShellPolicy();
-        
+
         // Add common safe commands
         policy.OkCmds.Add(new CmdSpec("echo"));
         policy.OkCmds.Add(new CmdSpec("cat"));
@@ -19,7 +19,7 @@ public sealed class ValidationTests
         policy.OkCmds.Add(new CmdSpec("grep"));
         policy.OkCmds.Add(new CmdSpec("find", execFlags: new[] { "-exec", "-execdir" }));
         policy.OkCmds.Add(new CmdSpec("curl", destFlags: new[] { "-o", "--output" }));
-        
+
         // Add allowed destinations
         policy.OkDests.Add("./");
         policy.OkDests.Add("/tmp");
@@ -62,9 +62,9 @@ public sealed class ValidationTests
     {
         var policy = new ShellPolicy();
         policy.OkCmds.Add(new CmdSpec("git status"));
-        
+
         var tokens = new[] { "git", "status", "--porcelain" };
-        
+
         Should.NotThrow(() => ShellValidator.ValidateCommand(tokens, policy.OkCmds));
     }
 
@@ -72,9 +72,9 @@ public sealed class ValidationTests
     public void ValidateDestination_AllowedPath_ReturnsTrue()
     {
         var allowedDests = new HashSet<string> { "./", "/tmp" };
-        
+
         bool result = ShellValidator.ValidateDestination("./output.txt", allowedDests);
-        
+
         result.ShouldBeTrue();
     }
 
@@ -82,9 +82,9 @@ public sealed class ValidationTests
     public void ValidateDestination_DisallowedPath_ReturnsFalse()
     {
         var allowedDests = new HashSet<string> { "./", "/tmp" };
-        
+
         bool result = ShellValidator.ValidateDestination("/etc/passwd", allowedDests);
-        
+
         result.ShouldBeFalse();
     }
 
@@ -94,9 +94,9 @@ public sealed class ValidationTests
         var currentDir = Directory.GetCurrentDirectory();
         var allowedDests = new HashSet<string> { "./" };
         var destInCurrentDir = Path.Combine(currentDir, "test.txt");
-        
+
         bool result = ShellValidator.ValidateDestination(destInCurrentDir, allowedDests);
-        
+
         result.ShouldBeTrue();
     }
 
@@ -104,9 +104,9 @@ public sealed class ValidationTests
     public void ValidateDestination_TmpPath_ReturnsTrue()
     {
         var allowedDests = new HashSet<string> { "/tmp" };
-        
+
         bool result = ShellValidator.ValidateDestination("/tmp/output.log", allowedDests);
-        
+
         result.ShouldBeTrue();
     }
 
@@ -125,9 +125,9 @@ public sealed class ValidationTests
     {
         string input = "~/test.txt";
         string expected = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "test.txt");
-        
+
         string result = ShellValidator.NormalizeDestination(input);
-        
+
         result.ShouldBe(expected);
     }
 
@@ -136,9 +136,9 @@ public sealed class ValidationTests
     {
         string input = "~";
         string expected = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        
+
         string result = ShellValidator.NormalizeDestination(input);
-        
+
         result.ShouldBe(expected);
     }
 
@@ -147,9 +147,9 @@ public sealed class ValidationTests
     {
         string input = "./test.txt";
         string expected = Path.Combine(Directory.GetCurrentDirectory(), "test.txt");
-        
+
         string result = ShellValidator.NormalizeDestination(input);
-        
+
         result.ShouldBe(expected);
     }
 
@@ -158,10 +158,10 @@ public sealed class ValidationTests
     {
         var tmpDir = Path.GetTempPath();
         Environment.SetEnvironmentVariable("TEST_DIR", tmpDir);
-        
+
         string input = "$TEST_DIR/test.txt";
         string result = ShellValidator.NormalizeDestination(input);
-        
+
         result.ShouldStartWith(tmpDir);
     }
 

@@ -1,0 +1,8 @@
+workflow: GitHubFlow/v1
+tag-prefix: '[vV]'
+branches:
+  main:
+    mode: ContinuousDelivery
+    label: ci
+    increment: Patch
+    regex: ^main$

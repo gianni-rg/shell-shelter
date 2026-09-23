@@ -190,6 +190,14 @@ See detailed docs:
 - [docs/config-guide.md](docs/config-guide.md)
 - [docs/powershell-guide.md](docs/powershell-guide.md)
 
+## Pi Coding Agent Extension
+
+The [`.pi/extensions/`](.pi/extensions/) folder ships a [pi coding agent](https://github.com/badlogic/pi-mono) extension that gates every `bash`/`PowerShell` tool call pi makes through the ShellShelter allowlist engine. Blocked commands prompt you to block, execute once, allow for the session, or permanently add them to `.shellshelter`.
+
+Requires the `shellshelter` CLI installed globally (see [Installation as .NET Global Tool](#installation-as-net-global-tool)). To use it in your own project, copy `.pi/extensions/shell-shelter-gate.ts` into your project's `.pi/extensions/` folder or in the `.pi/extensions/` folder of your home directory to be used in any project.
+
+See [.pi/extensions/README.md](.pi/extensions/README.md) for installation options, configuration, and debugging.
+
 ## Acknowledgements
 
 Inspired by [Answer.AI's SafeCmd](https://answerdotai.github.io/safecmd/), a helper tool that solves the problem of running shell commands from untrusted sources by validating bash commands against an allowlist before execution.

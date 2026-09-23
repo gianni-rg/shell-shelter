@@ -78,8 +78,47 @@ try
                 return 0;
             }
 
+        case "validate" when argsStart + 2 < args.Length:
+            {
+                string validateShell = args[argsStart + 1].ToLowerInvariant();
+                string validateCmd = string.Join(' ', args[(argsStart + 2)..]);
+                switch (validateShell)
+                {
+                    case "bash":
+                        {
+                            ShellPolicy policy = LoadBashPolicy(loader, resolvedConfig);
+                            var maps = BashShell.BuildExtractionMaps(policy);
+                            await BashShell.ValidateAsync(
+                                validateCmd,
+                                policy,
+                                execFlags: maps.ExecFlags,
+                                destFlags: maps.DestFlags,
+                                execPos: maps.ExecPos,
+                                destPos: maps.DestPos);
+                            return 0;
+                        }
+
+                    case "pwsh":
+                        {
+                            ShellPolicy policy = LoadPsPolicy(loader, resolvedConfig);
+                            await PsShell.ValidateAsync(validateCmd, policy);
+                            return 0;
+                        }
+
+                    default:
+                        Console.Error.WriteLine($"Unknown shell '{validateShell}' for validate. Use 'bash' or 'pwsh'.");
+                        PrintUsage();
+                        return 1;
+                }
+            }
+
+        case "validate":
+            Console.Error.WriteLine("'validate' requires a shell ('bash'|'pwsh') and a command.");
+            PrintUsage();
+            return 1;
+
         case "config" when (argsStart + 1 < args.Length && args[argsStart + 1].Equals("path", StringComparison.OrdinalIgnoreCase)):
-            Console.WriteLine(ConfigLoader.GetDefaultConfigPath());
+            Console.WriteLine(resolvedConfig ?? ConfigLoader.GetDefaultConfigPath());
             return 0;
 
         case "config":
@@ -93,7 +132,7 @@ try
                 string output = format switch
                 {
                     "json" => DefaultConfigs.BashDefaultJson,
-                    "ini" => DefaultConfigs.BashDefaultIni + Environment.NewLine + DefaultConfigs.PsDefaultIni,
+                    "ini" => DefaultConfigs.BashDefaultIni + Environment.NewLine + DefaultConfigs.PsDefaultIniPlatform,
                     _ => throw new ArgumentException($"Unknown export format: {format}")
                 };
                 Console.Write(output);
@@ -181,7 +220,7 @@ static ShellPolicy LoadPsPolicy(ConfigLoader loader, string? configPath)
         return loader.Load(configPath).PsPolicy;
 
     string globalConfigPath = ConfigLoader.GetDefaultConfigPath();
-    return loader.LoadOrDefault(globalConfigPath, DefaultConfigs.BashDefaultIni + "\n" + DefaultConfigs.PsDefaultIni).PsPolicy;
+    return loader.LoadOrDefault(globalConfigPath, DefaultConfigs.BashDefaultIni + "\n" + DefaultConfigs.PsDefaultIniPlatform).PsPolicy;
 }
 
 static void PrintUsage()
@@ -196,11 +235,13 @@ static void PrintUsage()
         Subcommands:
           bash <cmd>                   Run <cmd> in bash against the allowlist
           pwsh <cmd>                   Run <cmd> in pwsh against the allowlist
-          config path                  Print the active (global) config file path
-          export json|ini              Print the default allowlist config as JSON or INI
+          validate bash|pwsh <cmd>     Validate <cmd> against the allowlist without executing it
+          config path                  Print the active config file path (respects --config)
+          export json|ini              Print the built-in default allowlist as JSON or INI
 
         Examples:
           shellshelter bash "echo hello"
+          shellshelter validate bash "echo hello"
           shellshelter export json > shellshelter.json
           shellshelter -c . pwsh "Get-ChildItem"
         """);

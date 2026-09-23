@@ -77,6 +77,7 @@ dotnet tool uninstall --global ShellShelter.Cli
 ```bash
 dotnet run --project src/ShellShelter.Cli -- bash "echo hello"
 dotnet run --project src/ShellShelter.Cli -- pwsh "Get-ChildItem"
+dotnet run --project src/ShellShelter.Cli -- validate bash "echo hello"
 dotnet run --project src/ShellShelter.Cli -- config path
 ```
 
@@ -85,8 +86,21 @@ Or with the global tool installed:
 ```bash
 shellshelter bash "echo hello"
 shellshelter pwsh "Get-ChildItem"
+shellshelter validate bash "echo hello"
 shellshelter config path
 ```
+
+#### Validate Without Executing
+
+Use `validate <bash|pwsh> <cmd>` to check a command against the allowlist without running it — useful for gating tool calls (e.g. in editor/agent integrations) before deciding whether to execute:
+
+```bash
+shellshelter validate bash "echo hello"     # exit 0: allowed
+shellshelter validate bash "rm -rf /"       # exit 2: denied, nothing executed
+shellshelter validate pwsh "Get-ChildItem"
+```
+
+Exit codes match the executing subcommands: `0` allowed, `2` denied. `validate bash` also exits `3` if `shfmt` is missing (Bash validation parses the command via `shfmt`). `validate pwsh` parses and validates in-process via the PowerShell AST parser and does not require `pwsh` to be installed — `pwsh` is only needed to *execute* a PowerShell command, not to validate one.
 
 #### Custom Config
 
@@ -189,6 +203,14 @@ See detailed docs:
 
 - [docs/config-guide.md](docs/config-guide.md)
 - [docs/powershell-guide.md](docs/powershell-guide.md)
+
+## Pi Coding Agent Extension
+
+The [`.pi/extensions/`](.pi/extensions/) folder ships a [pi coding agent](https://github.com/badlogic/pi-mono) extension that gates every `bash`/`PowerShell` tool call pi makes through the ShellShelter allowlist engine. Blocked commands prompt you to block, execute once, allow for the session, or permanently add them to `.shellshelter`.
+
+Requires the `shellshelter` CLI installed globally (see [Installation as .NET Global Tool](#installation-as-net-global-tool)). To use it in your own project, copy `.pi/extensions/shell-shelter-gate.ts` into your project's `.pi/extensions/` folder or in the `.pi/agent/extensions/` folder of your home directory to be used in any project.
+
+See [.pi/extensions/README.md](.pi/extensions/README.md) for installation options, configuration, and debugging.
 
 ## Acknowledgements
 

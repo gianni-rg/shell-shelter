@@ -286,7 +286,8 @@ public static class DefaultConfigs
             + "\n    gcloud sql instances list, gcloud sql instances describe"
             + "\n    gcloud storage ls, gcloud storage cat"
             + "\n    gcloud logging read"
-            + "\n    # toolslm\n            folder2ctx, repo2ctx`n            # Self-management`n            shellshelter"
+            + "\n    # toolslm\n    folder2ctx, repo2ctx\n"
+            + "\n    # Self-management\n    shellshelter"
             + "\n    # Positional exec/dest handling\n    env:exec=$0, xargs:exec=$0"
             + "\n    tee:dest=$0, ex:dest=$2, cp:dest=$-1, mv:dest=$-1, mkdir:dest=$-1"
             + "\n    # Exec/dest flag handling\n    find:-delete|-ok|-okdir:exec=-exec|-execdir"
@@ -338,7 +339,8 @@ public static class DefaultConfigs
             + "\n    gcloud sql instances list, gcloud sql instances describe"
             + "\n    gcloud storage ls, gcloud storage cat"
             + "\n    gcloud logging read"
-            + "\n    # toolslm\n            folder2ctx, repo2ctx`n            # Self-management`n            shellshelter"
+            + "\n    # toolslm\n    folder2ctx, repo2ctx"
+            + "\n    # Self-management\n    shellshelter"
             + "\n    # Positional exec/dest handling\n    env:exec=$0, xargs:exec=$0"
             + "\n    tee:dest=$0, ex:dest=$2, cp:dest=$-1, mv:dest=$-1, mkdir:dest=$-1"
             + "\n    # Exec/dest flag handling\n    find:-delete|-ok|-okdir:exec=-exec|-execdir"
@@ -351,11 +353,16 @@ public static class DefaultConfigs
     // PowerShell defaults (defined before BashDefaultJson so it can reference them)
     // ---------------------------------------------------------------------------
 
-    private static readonly string[] PsDefaultOkDests =
-    [
-        ".\\",
-        "$env:TEMP",
-    ];
+    private static readonly string[] PsDefaultOkDests = OperatingSystem.IsWindows()
+        ? [
+            ".\\",
+            "$env:TEMP",
+        ]
+        : [
+            ".\\",
+            "$env:TEMP",
+            "/tmp",
+        ];
 
     private static readonly string[] PsDefaultOkCmds =
     [
@@ -426,6 +433,11 @@ public static class DefaultConfigs
     /// <summary>
     /// Gets the built-in PowerShell default INI configuration section.
     /// </summary>
+    /// <remarks>
+    /// Preserved as a compile-time constant for source/binary compatibility with existing
+    /// consumers (e.g. usage in <c>const</c>/attribute contexts). Use
+    /// <see cref="PsDefaultIniPlatform"/> for the platform-aware destination list.
+    /// </remarks>
     public const string PsDefaultIni = """
         [POWERSHELL]
         ok_dests = .\, $env:TEMP
@@ -456,4 +468,14 @@ public static class DefaultConfigs
             shellshelter
             Tee-Object:dest=-FilePath|-LiteralPath
         """;
+
+    /// <summary>
+    /// Gets the platform-aware PowerShell default INI configuration section, including
+    /// <c>/tmp</c> in <c>ok_dests</c> on non-Windows platforms.
+    /// </summary>
+    public static string PsDefaultIniPlatform =>
+        (OperatingSystem.IsWindows()
+            ? "[POWERSHELL]\nok_dests = .\\, $env:TEMP\n\n"
+            : "[POWERSHELL]\nok_dests = .\\, $env:TEMP, /tmp\n\n") +
+        PsDefaultIni[(PsDefaultIni.IndexOf("ok_cmds", StringComparison.Ordinal))..];
 }

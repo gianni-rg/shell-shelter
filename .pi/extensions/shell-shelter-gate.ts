@@ -74,13 +74,20 @@ function saveConfig(config: ShellShelterConfig): void {
   fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n");
 }
 
-/** Returns false (and leaves the file untouched) when the config is INI-formatted or unavailable. */
+/** Returns false (and leaves the file untouched) when the config is INI-formatted, unparsable, or unavailable. */
 function addCommandToConfig(key: "bash" | "powershell", cmdSpec: string): boolean {
   if (!configPath || (fs.existsSync(configPath) && !isJsonConfigFile(configPath))) {
     return false;
   }
 
-  const config = loadConfig() ?? { bash: { okDests: [], okCmds: [] }, powershell: { okDests: [], okCmds: [] } };
+  // Only synthesize a fresh empty config when no file exists yet; if one exists but fails to
+  // parse (e.g. rejected by JSON.parse), refuse rather than silently erasing it.
+  const fileExists = fs.existsSync(configPath);
+  const config = fileExists
+    ? loadConfig()
+    : { bash: { okDests: [], okCmds: [] }, powershell: { okDests: [], okCmds: [] } };
+  if (!config) return false;
+
   if (!config[key]) config[key] = { okDests: [], okCmds: [] };
   if (!config[key].okCmds) config[key].okCmds = [];
   // Avoid duplicates
@@ -215,7 +222,7 @@ async function gateCommand(
         ctx.ui?.notify(`Added to .shellshelter: ${cmd}`, "info");
       } else {
         ctx.ui?.notify(
-          `Cannot auto-add: ${configPath ?? ".shellshelter"} is not JSON. Edit it manually to add "${cmd}".`,
+          `Cannot auto-add: ${configPath ?? ".shellshelter"} could not be safely updated (non-JSON or unparsable). Edit it manually to add "${cmd}".`,
           "warning"
         );
       }

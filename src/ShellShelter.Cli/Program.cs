@@ -128,7 +128,7 @@ catch (Exception ex)
 static string? ResolveConfigPath(string? customConfig)
 {
     if (customConfig == null)
-        return null; // Use global default
+        return null; // Let the policy loader check the global default
 
     if (customConfig.Equals(".", StringComparison.OrdinalIgnoreCase))
     {
@@ -164,6 +164,10 @@ static ShellPolicy LoadBashPolicy(ConfigLoader loader, string? configPath)
     if (configPath != null)
         return loader.Load(configPath).BashPolicy;
 
+    string globalConfigPath = ConfigLoader.GetDefaultConfigPath();
+    if (File.Exists(globalConfigPath))
+        return loader.Load(globalConfigPath).BashPolicy;
+
     return loader.LoadFromText(DefaultConfigs.BashDefaultIni).BashPolicy;
 }
 
@@ -171,6 +175,10 @@ static ShellPolicy LoadPsPolicy(ConfigLoader loader, string? configPath)
 {
     if (configPath != null)
         return loader.Load(configPath).PsPolicy;
+
+    string globalConfigPath = ConfigLoader.GetDefaultConfigPath();
+    if (File.Exists(globalConfigPath))
+        return loader.Load(globalConfigPath).PsPolicy;
 
     return loader.LoadFromText(DefaultConfigs.BashDefaultIni + "\n" + DefaultConfigs.PsDefaultIni).PsPolicy;
 }

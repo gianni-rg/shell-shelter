@@ -186,11 +186,13 @@ async function promptGateChoice(
 ): Promise<GateChoice> {
   if (!ctx.hasUI || !ctx.ui) return "block"; // Fail closed when no UI to prompt
 
-  const cmdShort = cmd.length > 80 ? cmd.slice(0, 80) + "…" : cmd;
+  // Show the full, untruncated command in the prompt title — truncating it (as the option
+  // labels used to) could hide a dangerous suffix from the user while still executing/
+  // persisting the complete command once approved.
   const choice = await ctx.ui.select(
-    `ShellShelter: command blocked`,
+    `ShellShelter: command blocked\n\n${cmd}`,
     [
-      `🚫 Block "${cmdShort}"`,
+      `🚫 Block`,
       `▶ Execute once`,
       `🔓 Allow for this session`,
       `✅ Add to allowlist`,

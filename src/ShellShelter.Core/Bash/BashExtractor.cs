@@ -236,7 +236,8 @@ public sealed class BashExtractor : IShellExtractor
                     commands[^1].Add(hdocText);
                 }
                 // Handle here-string (<<<)
-                else if (redirect.GetPropertyOrNull("Op")?.GetInt32() == 73)
+                else if (redirect.GetPropertyOrNull("Op") is JsonElement redirectOp
+                    && IsHereStringOperator(redirectOp))
                 {
                     commands[^1].Add("<<<");
                     if (redirect.GetPropertyOrNull("Word") is JsonElement word && word.ValueKind == JsonValueKind.Object)
@@ -343,8 +344,9 @@ public sealed class BashExtractor : IShellExtractor
             ops.Add("=");
 
         // Check Op field
-        if (node.GetPropertyOrNull("Op")?.GetInt32() is int opCode
-            && TryMapOperatorCode(opCode, useLegacyOpCodes, out var opStr))
+        if (node.GetPropertyOrNull("Op") is JsonElement operatorElement
+            && (operatorElement.ValueKind != JsonValueKind.String || IsOperatorNode(node))
+            && TryGetOperatorText(operatorElement, useLegacyOpCodes, out var opStr))
             ops.Add(opStr);
 
         // Recurse into all properties
@@ -388,8 +390,8 @@ public sealed class BashExtractor : IShellExtractor
         {
             foreach (var redir in redirList.EnumerateArray().Where(r => r.ValueKind == JsonValueKind.Object))
             {
-                int? opCode = redir.GetPropertyOrNull("Op")?.GetInt32();
-                if (opCode.HasValue && TryMapWriteOperatorCode(opCode.Value, useLegacyOpCodes, out var op) &&
+                if (redir.GetPropertyOrNull("Op") is JsonElement operatorElement
+                    && TryGetWriteOperatorText(operatorElement, useLegacyOpCodes, out var op) &&
                     redir.GetPropertyOrNull("Word") is JsonElement word && word.ValueKind == JsonValueKind.Object)
                 {
                     redirects.Add((op, WordText(word, originalCmd)));
@@ -531,6 +533,51 @@ public sealed class BashExtractor : IShellExtractor
         return (useLegacyOpCodes ? WriteOpsLegacy : WriteOpsNew).TryGetValue(opCode, out op!);
     }
 
+    private static bool IsHereStringOperator(JsonElement operatorElement)
+    {
+        return operatorElement.ValueKind == JsonValueKind.String
+            ? operatorElement.GetString() == "<<<"
+            : operatorElement.ValueKind == JsonValueKind.Number && operatorElement.GetInt32() == 73;
+    }
+
+    private static bool IsOperatorNode(JsonElement node)
+    {
+        return node.GetPropertyOrNull("Type")?.GetString() == "BinaryCmd"
+            || node.GetPropertyOrNull("Word") is JsonElement;
+    }
+
+    private static bool TryGetOperatorText(JsonElement operatorElement, bool useLegacyOpCodes, out string op)
+    {
+        if (operatorElement.ValueKind == JsonValueKind.String)
+        {
+            op = operatorElement.GetString()!;
+            return op is "&&" or "||" or "|" or "|&" or ">" or ">>" or "<" or "<&" or ">&" or "&>" or "&>>";
+        }
+
+        if (operatorElement.ValueKind == JsonValueKind.Number
+            && TryMapOperatorCode(operatorElement.GetInt32(), useLegacyOpCodes, out op!))
+            return true;
+
+        op = string.Empty;
+        return false;
+    }
+
+    private static bool TryGetWriteOperatorText(JsonElement operatorElement, bool useLegacyOpCodes, out string op)
+    {
+        if (operatorElement.ValueKind == JsonValueKind.String)
+        {
+            op = operatorElement.GetString()!;
+            return op is ">" or ">>" or "&>" or "&>>";
+        }
+
+        if (operatorElement.ValueKind == JsonValueKind.Number
+            && TryMapWriteOperatorCode(operatorElement.GetInt32(), useLegacyOpCodes, out op!))
+            return true;
+
+        op = string.Empty;
+        return false;
+    }
+
     private static bool UsesLegacyOperatorCodes(JsonElement node)
     {
         var opCodes = new HashSet<int>();
@@ -555,7 +602,9 @@ public sealed class BashExtractor : IShellExtractor
         if (node.ValueKind != JsonValueKind.Object)
             return;
 
-        if (node.GetPropertyOrNull("Op")?.GetInt32() is int opCode)
+        if (node.GetPropertyOrNull("Op") is JsonElement operatorElement
+            && operatorElement.ValueKind == JsonValueKind.Number
+            && operatorElement.GetInt32() is int opCode)
             opCodes.Add(opCode);
 
         foreach (var prop in node.EnumerateObject())

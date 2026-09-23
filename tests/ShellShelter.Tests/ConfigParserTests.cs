@@ -126,13 +126,104 @@ public sealed class ConfigParserTests
     }
 
     [Fact]
+    public void Load_MissingFile_ThrowsInsteadOfUsingDefaults()
+    {
+        ConfigLoader loader = new();
+        string path = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.json");
+
+        Should.Throw<FileNotFoundException>(() => loader.Load(path));
+    }
+
+    [Fact]
+    public void Load_MalformedFile_ThrowsInsteadOfUsingDefaults()
+    {
+        string path = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.json");
+
+        try
+        {
+            File.WriteAllText(path, "{");
+            ConfigLoader loader = new();
+
+            Should.Throw<JsonException>(() => loader.Load(path));
+        }
+        finally
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+    }
+
+    [Fact]
+    public void LoadOrDefault_MalformedFile_FallsBackToDefaults()
+    {
+        string path = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.json");
+
+        try
+        {
+            File.WriteAllText(path, "{");
+            ConfigLoader loader = new();
+
+            ShellPolicyPair result = loader.LoadOrDefault(path, DefaultConfigs.BashDefaultIni);
+
+            result.BashPolicy.OkCmds.ShouldContain(new CmdSpec("git status"));
+        }
+        finally
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+    }
+
+    [Fact]
+    public void LoadOrDefault_MissingFile_FallsBackToDefaults()
+    {
+        ConfigLoader loader = new();
+        string path = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.json");
+
+        ShellPolicyPair result = loader.LoadOrDefault(path, DefaultConfigs.BashDefaultIni);
+
+        result.BashPolicy.OkCmds.ShouldContain(new CmdSpec("git status"));
+    }
+
+    [Fact]
+    public void LoadOrDefault_ValidFile_LoadsFileInsteadOfDefaults()
+    {
+        string path = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.json");
+
+        try
+        {
+            File.WriteAllText(path, """{"bash":{"okCmds":["sed"],"okDests":[]}}""");
+            ConfigLoader loader = new();
+
+            ShellPolicyPair result = loader.LoadOrDefault(path, DefaultConfigs.BashDefaultIni);
+
+            result.BashPolicy.OkCmds.ShouldBe([new CmdSpec("sed")]);
+        }
+        finally
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+    }
+
+    [Fact]
     public void LoadFromText_DefaultIni_LoadsAuthoritativePythonDefaults()
     {
         ConfigLoader loader = new();
 
         ShellPolicyPair result = loader.LoadFromText(DefaultConfigs.BashDefaultIni, "config.ini");
 
-        result.BashPolicy.OkDests.OrderBy(static dest => dest, StringComparer.Ordinal).ShouldBe(["./", "/dev/null", "/tmp"]);
+        string[] expectedDests = OperatingSystem.IsWindows()
+            ? ["%TEMP%", "./", "C:\\Temp", "/dev/null"]
+            : ["./", "/dev/null", "/tmp"];
+        result.BashPolicy.OkDests.OrderBy(static dest => dest, StringComparer.Ordinal)
+            .ShouldBe(expectedDests.OrderBy(static dest => dest, StringComparer.Ordinal));
         result.BashPolicy.OkCmds.ShouldContain(new CmdSpec("git status"));
         result.BashPolicy.OkCmds.ShouldContain(new CmdSpec("env", execPos: [0]));
         result.BashPolicy.OkCmds.ShouldContain(new CmdSpec("curl", destFlags: ["-o", "--output"]));
@@ -149,10 +240,19 @@ public sealed class ConfigParserTests
 
         ShellPolicyPair result = loader.LoadFromText(DefaultConfigs.BashDefaultJson, "config.json");
 
-        result.BashPolicy.OkDests.OrderBy(static dest => dest, StringComparer.Ordinal).ShouldBe(["./", "/dev/null", "/tmp"]);
+        string[] expectedDests = OperatingSystem.IsWindows()
+            ? ["%TEMP%", "./", "C:\\Temp", "/dev/null"]
+            : ["./", "/dev/null", "/tmp"];
+        result.BashPolicy.OkDests.OrderBy(static dest => dest, StringComparer.Ordinal)
+            .ShouldBe(expectedDests.OrderBy(static dest => dest, StringComparer.Ordinal));
         result.BashPolicy.OkCmds.ShouldContain(new CmdSpec("tar"));
         result.BashPolicy.OkCmds.ShouldContain(new CmdSpec("["));
-        result.PsPolicy.OkCmds.ShouldBeEmpty();
-        result.PsPolicy.OkDests.ShouldBeEmpty();
+        // PowerShell defaults should be loaded from BashDefaultJson
+        result.PsPolicy.OkDests.ShouldContain(".\\");
+        result.PsPolicy.OkDests.ShouldContain("$env:TEMP");
+        result.PsPolicy.OkCmds.ShouldContain(new CmdSpec("Get-ChildItem"));
+        result.PsPolicy.OkCmds.ShouldContain(new CmdSpec("Get-Content"));
+        result.PsPolicy.OkCmds.ShouldContain(new CmdSpec("git log"));
+        result.PsPolicy.OkCmds.ShouldContain(new CmdSpec("dotnet build"));
     }
 }

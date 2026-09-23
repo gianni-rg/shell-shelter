@@ -36,6 +36,40 @@ If the tool is still unavailable on a later call, ShellShelter throws immediatel
 dotnet build ShellShelter.sln
 ```
 
+## Packaging
+
+To publish the CLI as a standalone, single-file executable:
+
+```bash
+dotnet publish src/ShellShelter.Cli/ShellShelter.Cli.csproj --configuration Release --runtime win-x64 --self-contained true -p:PublishSingleFile=true -o dist
+```
+
+This produces `dist\shellshelter.exe` ready to copy to any Windows x64 machine.
+
+## Installation as .NET Global Tool
+
+To install ShellShelter as a global .NET tool from the local NuGet package:
+
+```bash
+dotnet pack src/ShellShelter.Core/ShellShelter.Core.csproj --configuration Release -o ./.local-packages
+dotnet pack src/ShellShelter.Cli/ShellShelter.Cli.csproj --configuration Release -o ./.local-packages
+dotnet tool install --global ShellShelter.Cli --add-source ./.local-packages --ignore-failed-sources
+```
+
+Once installed, you can invoke `shellshelter` from any terminal.
+
+To update:
+
+```bash
+dotnet tool update --global ShellShelter.Cli --add-source ./.local-packages --ignore-failed-sources
+```
+
+To uninstall:
+
+```bash
+dotnet tool uninstall --global ShellShelter.Cli
+```
+
 ## Quick Start
 
 ### CLI
@@ -44,6 +78,14 @@ dotnet build ShellShelter.sln
 dotnet run --project src/ShellShelter.Cli -- bash "echo hello"
 dotnet run --project src/ShellShelter.Cli -- pwsh "Get-ChildItem"
 dotnet run --project src/ShellShelter.Cli -- config path
+```
+
+Or with the global tool installed:
+
+```bash
+shellshelter bash "echo hello"
+shellshelter pwsh "Get-ChildItem"
+shellshelter config path
 ```
 
 ### C# API

@@ -193,7 +193,12 @@ async function gateCommand(
     return { blocked: false, reason: "" };
   }
 
-  // Denied by policy, or the CLI check failed to run — prompt user (fails closed without UI)
+  // Only exit code 2 is a policy denial eligible for override; anything else (missing CLI,
+  // missing shfmt/pwsh, timeout, malformed config, ...) is an infrastructure failure and stays blocked.
+  if (result.code !== 2) {
+    return { blocked: true, reason: result.stderr || "ShellShelter validation unavailable" };
+  }
+
   const choice = await promptGateChoice(cmd, shell, ctx);
   switch (choice) {
     case "allow_session": {
@@ -202,12 +207,15 @@ async function gateCommand(
       break;
     }
     case "add_to_allowlist": {
-      const added = addCommandToConfig(shell, extractCommandPrefix(cmd));
+      // Persist the exact command, not just its prefix — CmdSpec treats the name as an
+      // allowlisted prefix, so a truncated prefix (e.g. "rm -rf") would permit arbitrary
+      // trailing arguments/destinations on every future invocation.
+      const added = addCommandToConfig(shell, cmd);
       if (added) {
-        ctx.ui?.notify(`Added to .shellshelter: ${extractCommandPrefix(cmd)}`, "info");
+        ctx.ui?.notify(`Added to .shellshelter: ${cmd}`, "info");
       } else {
         ctx.ui?.notify(
-          `Cannot auto-add: ${configPath ?? ".shellshelter"} is not JSON. Edit it manually to add "${extractCommandPrefix(cmd)}".`,
+          `Cannot auto-add: ${configPath ?? ".shellshelter"} is not JSON. Edit it manually to add "${cmd}".`,
           "warning"
         );
       }

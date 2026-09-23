@@ -70,6 +70,30 @@ public sealed class ConfigLoader
     }
 
     /// <summary>
+    /// Loads a configuration file from disk, falling back to built-in defaults if the file is
+    /// missing or fails to parse.
+    /// </summary>
+    /// <param name="path">The configuration file path, or <c>null</c> to always use the default.</param>
+    /// <param name="defaultConfigText">The built-in default configuration text to fall back to.</param>
+    /// <returns>The parsed shell policy pair from <paramref name="path"/>, or the parsed defaults.</returns>
+    public ShellPolicyPair LoadOrDefault(string? path, string defaultConfigText)
+    {
+        if (path is not null && File.Exists(path))
+        {
+            try
+            {
+                return Load(path);
+            }
+            catch
+            {
+                // Malformed config: fall through to built-in defaults.
+            }
+        }
+
+        return LoadFromText(defaultConfigText);
+    }
+
+    /// <summary>
     /// Loads configuration text by detecting the format from the source path or content.
     /// </summary>
     /// <param name="content">The configuration content.</param>

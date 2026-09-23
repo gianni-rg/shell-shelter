@@ -43,7 +43,7 @@ public static class BashTools
         ArgumentException.ThrowIfNullOrEmpty(cmd);
 
         ShellPolicy policy = LoadBashPolicy().WithRemove(rmCmds, rmDests);
-        var maps = BuildExtractionMaps(policy);
+        var maps = BashShell.BuildExtractionMaps(policy);
 
         try
         {
@@ -97,7 +97,7 @@ public static class BashTools
             : LoadBashPolicy();
 
         ShellPolicy policy = basePolicy.WithAdd(addCmds, addDests).WithRemove(rmCmds, rmDests);
-        var maps = BuildExtractionMaps(policy);
+        var maps = BashShell.BuildExtractionMaps(policy);
 
         try
         {
@@ -310,10 +310,7 @@ public static class BashTools
     private static ShellPolicy LoadBashPolicy()
     {
         string configPath = ConfigLoader.GetDefaultConfigPath();
-        if (File.Exists(configPath))
-            return _configLoader.Load(configPath).BashPolicy;
-
-        return _configLoader.LoadFromText(DefaultConfigs.BashDefaultIni).BashPolicy;
+        return _configLoader.LoadOrDefault(configPath, DefaultConfigs.BashDefaultIni).BashPolicy;
     }
 
     private static ShellPolicy BuildOverridePolicy(string? cmds, string? dests)
@@ -334,50 +331,6 @@ public static class BashTools
         }
 
         return new ShellPolicy(okCmds, okDests);
-    }
-
-    private static (
-        IReadOnlyDictionary<string, IReadOnlySet<string>> ExecFlags,
-        IReadOnlyDictionary<string, IReadOnlySet<string>> DestFlags,
-        IReadOnlyDictionary<string, IReadOnlySet<int>> ExecPos,
-        IReadOnlyDictionary<string, IReadOnlySet<int>> DestPos)
-        BuildExtractionMaps(ShellPolicy policy)
-    {
-        var execFlags = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
-        var destFlags = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
-        var execPos = new Dictionary<string, HashSet<int>>(StringComparer.Ordinal);
-        var destPos = new Dictionary<string, HashSet<int>>(StringComparer.Ordinal);
-
-        foreach (CmdSpec spec in policy.OkCmds)
-        {
-            if (spec.Name.Count == 0)
-                continue;
-
-            string cmdName = string.Join(" ", spec.Name);
-
-            AddStringMapValues(execFlags, cmdName, spec.ExecFlags);
-            AddStringMapValues(destFlags, cmdName, spec.DestFlags);
-            AddIntMapValues(execPos, cmdName, spec.ExecPos);
-            AddIntMapValues(destPos, cmdName, spec.DestPos);
-        }
-
-        return (
-            execFlags.ToDictionary(
-                kvp => kvp.Key,
-                kvp => (IReadOnlySet<string>)kvp.Value,
-                StringComparer.Ordinal),
-            destFlags.ToDictionary(
-                kvp => kvp.Key,
-                kvp => (IReadOnlySet<string>)kvp.Value,
-                StringComparer.Ordinal),
-            execPos.ToDictionary(
-                kvp => kvp.Key,
-                kvp => (IReadOnlySet<int>)kvp.Value,
-                StringComparer.Ordinal),
-            destPos.ToDictionary(
-                kvp => kvp.Key,
-                kvp => (IReadOnlySet<int>)kvp.Value,
-                StringComparer.Ordinal));
     }
 
     private static ToolResult? ValidateSedDestinationIfNeeded(string path, bool inplace, ShellPolicy policy)
@@ -403,40 +356,6 @@ public static class BashTools
         int width = lines.Length.ToString().Length;
         return string.Join('\n',
             lines.Select((line, index) => $"{(index + 1).ToString().PadLeft(width)} {line}"));
-    }
-
-    private static void AddStringMapValues(
-        IDictionary<string, HashSet<string>> map,
-        string key,
-        IReadOnlySet<string> values)
-    {
-        if (values.Count == 0)
-            return;
-
-        if (!map.TryGetValue(key, out var existing))
-        {
-            existing = new HashSet<string>(StringComparer.Ordinal);
-            map[key] = existing;
-        }
-
-        existing.UnionWith(values);
-    }
-
-    private static void AddIntMapValues(
-        IDictionary<string, HashSet<int>> map,
-        string key,
-        IReadOnlySet<int> values)
-    {
-        if (values.Count == 0)
-            return;
-
-        if (!map.TryGetValue(key, out var existing))
-        {
-            existing = new HashSet<int>();
-            map[key] = existing;
-        }
-
-        existing.UnionWith(values);
     }
 
     /// <summary>

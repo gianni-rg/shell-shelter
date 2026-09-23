@@ -209,10 +209,7 @@ public static class PsTools
     private static ShellPolicy LoadPsPolicy()
     {
         string configPath = ConfigLoader.GetDefaultConfigPath();
-        if (File.Exists(configPath))
-            return _configLoader.Load(configPath).PsPolicy;
-
-        return _configLoader.LoadFromText(DefaultConfigs.BashDefaultIni + "\n" + DefaultConfigs.PsDefaultIni).PsPolicy;
+        return _configLoader.LoadOrDefault(configPath, DefaultConfigs.BashDefaultIni + "\n" + DefaultConfigs.PsDefaultIni).PsPolicy;
     }
 
     private static ShellPolicy BuildOverridePolicy(string? cmds, string? dests)

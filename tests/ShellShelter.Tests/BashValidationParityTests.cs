@@ -71,11 +71,19 @@ public sealed class BashValidationParityTests
     [Theory]
     [InlineData("./output.txt")]
     [InlineData("./subdir/file.txt")]
-    [InlineData("/tmp/myfile.txt")]
     [InlineData("/dev/null")]
     public void ValidateDestination_DefaultPolicyAllowedDests_AllowsAll(string dest)
     {
         ShellPolicy policy = DefaultPolicy();
+
+        ShellValidator.ValidateDestination(dest, policy.OkDests).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void ValidateDestination_DefaultPolicyAllowedTempDest_AllowsAll()
+    {
+        ShellPolicy policy = DefaultPolicy();
+        string dest = OperatingSystem.IsWindows() ? "%TEMP%\\myfile.txt" : "/tmp/myfile.txt";
 
         ShellValidator.ValidateDestination(dest, policy.OkDests).ShouldBeTrue();
     }

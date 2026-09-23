@@ -58,7 +58,14 @@ try
         case "bash":
             {
                 ShellPolicy policy = LoadBashPolicy(loader, resolvedConfig);
-                string output = await BashShell.SafeRunAsync(cmd, policy);
+                var maps = BashShell.BuildExtractionMaps(policy);
+                string output = await BashShell.SafeRunAsync(
+                    cmd,
+                    policy,
+                    execFlags: maps.ExecFlags,
+                    destFlags: maps.DestFlags,
+                    execPos: maps.ExecPos,
+                    destPos: maps.DestPos);
                 Console.Write(output);
                 return 0;
             }
@@ -165,10 +172,7 @@ static ShellPolicy LoadBashPolicy(ConfigLoader loader, string? configPath)
         return loader.Load(configPath).BashPolicy;
 
     string globalConfigPath = ConfigLoader.GetDefaultConfigPath();
-    if (File.Exists(globalConfigPath))
-        return loader.Load(globalConfigPath).BashPolicy;
-
-    return loader.LoadFromText(DefaultConfigs.BashDefaultIni).BashPolicy;
+    return loader.LoadOrDefault(globalConfigPath, DefaultConfigs.BashDefaultIni).BashPolicy;
 }
 
 static ShellPolicy LoadPsPolicy(ConfigLoader loader, string? configPath)
@@ -177,10 +181,7 @@ static ShellPolicy LoadPsPolicy(ConfigLoader loader, string? configPath)
         return loader.Load(configPath).PsPolicy;
 
     string globalConfigPath = ConfigLoader.GetDefaultConfigPath();
-    if (File.Exists(globalConfigPath))
-        return loader.Load(globalConfigPath).PsPolicy;
-
-    return loader.LoadFromText(DefaultConfigs.BashDefaultIni + "\n" + DefaultConfigs.PsDefaultIni).PsPolicy;
+    return loader.LoadOrDefault(globalConfigPath, DefaultConfigs.BashDefaultIni + "\n" + DefaultConfigs.PsDefaultIni).PsPolicy;
 }
 
 static void PrintUsage()

@@ -133,6 +133,96 @@ public static class BashShell
     }
 
     /// <summary>
+    /// Builds the exec/dest flag and positional extraction maps from a policy's command specs.
+    /// </summary>
+    /// <remarks>
+    /// These maps drive <see cref="BashExtractor"/>'s recursive command and redirect-destination
+    /// discovery (e.g. <c>curl -o</c>, <c>find ... -exec</c>). Without them, nested commands and
+    /// flag-based destinations declared in the policy's <see cref="CmdSpec"/> entries are not
+    /// recursively validated.
+    /// </remarks>
+    /// <param name="policy">The shell policy whose command specs supply the extraction metadata.</param>
+    public static (
+        IReadOnlyDictionary<string, IReadOnlySet<string>> ExecFlags,
+        IReadOnlyDictionary<string, IReadOnlySet<string>> DestFlags,
+        IReadOnlyDictionary<string, IReadOnlySet<int>> ExecPos,
+        IReadOnlyDictionary<string, IReadOnlySet<int>> DestPos)
+        BuildExtractionMaps(ShellPolicy policy)
+    {
+        ArgumentNullException.ThrowIfNull(policy);
+
+        var execFlags = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+        var destFlags = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+        var execPos = new Dictionary<string, HashSet<int>>(StringComparer.Ordinal);
+        var destPos = new Dictionary<string, HashSet<int>>(StringComparer.Ordinal);
+
+        foreach (CmdSpec spec in policy.OkCmds)
+        {
+            if (spec.Name.Count == 0)
+                continue;
+
+            string cmdName = string.Join(" ", spec.Name);
+
+            AddStringMapValues(execFlags, cmdName, spec.ExecFlags);
+            AddStringMapValues(destFlags, cmdName, spec.DestFlags);
+            AddIntMapValues(execPos, cmdName, spec.ExecPos);
+            AddIntMapValues(destPos, cmdName, spec.DestPos);
+        }
+
+        return (
+            execFlags.ToDictionary(
+                kvp => kvp.Key,
+                kvp => (IReadOnlySet<string>)kvp.Value,
+                StringComparer.Ordinal),
+            destFlags.ToDictionary(
+                kvp => kvp.Key,
+                kvp => (IReadOnlySet<string>)kvp.Value,
+                StringComparer.Ordinal),
+            execPos.ToDictionary(
+                kvp => kvp.Key,
+                kvp => (IReadOnlySet<int>)kvp.Value,
+                StringComparer.Ordinal),
+            destPos.ToDictionary(
+                kvp => kvp.Key,
+                kvp => (IReadOnlySet<int>)kvp.Value,
+                StringComparer.Ordinal));
+    }
+
+    private static void AddStringMapValues(
+        IDictionary<string, HashSet<string>> map,
+        string key,
+        IReadOnlySet<string> values)
+    {
+        if (values.Count == 0)
+            return;
+
+        if (!map.TryGetValue(key, out var existing))
+        {
+            existing = new HashSet<string>(StringComparer.Ordinal);
+            map[key] = existing;
+        }
+
+        existing.UnionWith(values);
+    }
+
+    private static void AddIntMapValues(
+        IDictionary<string, HashSet<int>> map,
+        string key,
+        IReadOnlySet<int> values)
+    {
+        if (values.Count == 0)
+            return;
+
+        if (!map.TryGetValue(key, out var existing))
+        {
+            existing = new HashSet<int>();
+            map[key] = existing;
+        }
+
+        existing.UnionWith(values);
+    }
+
+    /// <summary>
     /// Synchronous wrapper for SafeRunAsync.
     /// </summary>
     public static string SafeRun(

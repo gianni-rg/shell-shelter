@@ -17,20 +17,24 @@ using ShellShelter.Core.PowerShell;
 string? customConfig = null;
 int argsStart = 0;
 
-for (int i = 0; i < args.Length; i++)
+while (argsStart < args.Length)
 {
-    if (args[i].Equals("--config", StringComparison.OrdinalIgnoreCase) || args[i].Equals("-c", StringComparison.OrdinalIgnoreCase))
+    string argument = args[argsStart];
+    if (argument.Equals("--config", StringComparison.OrdinalIgnoreCase) || argument.Equals("-c", StringComparison.OrdinalIgnoreCase))
     {
-        if (i + 1 >= args.Length)
+        if (argsStart + 1 >= args.Length)
         {
             Console.Error.WriteLine("--config requires a path argument.");
             PrintUsage();
             return 1;
         }
-        customConfig = args[i + 1];
-        argsStart = i + 2;
-        break;
+
+        customConfig = args[argsStart + 1];
+        argsStart += 2;
+        continue;
     }
+
+    break;
 }
 
 if (argsStart + 1 >= args.Length)

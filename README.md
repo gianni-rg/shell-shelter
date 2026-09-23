@@ -100,7 +100,7 @@ shellshelter validate bash "rm -rf /"       # exit 2: denied, nothing executed
 shellshelter validate pwsh "Get-ChildItem"
 ```
 
-Exit codes match the executing subcommands: `0` allowed, `2` denied, `3` if `shfmt`/`pwsh` is missing.
+Exit codes match the executing subcommands: `0` allowed, `2` denied. `validate bash` also exits `3` if `shfmt` is missing (Bash validation parses the command via `shfmt`). `validate pwsh` parses and validates in-process via the PowerShell AST parser and does not require `pwsh` to be installed — `pwsh` is only needed to *execute* a PowerShell command, not to validate one.
 
 #### Custom Config
 

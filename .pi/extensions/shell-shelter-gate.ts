@@ -333,7 +333,7 @@ export default function (pi: ExtensionAPI) {
         };
       }
 
-      return bashTool.execute(id, params, signal, onUpdate);
+      return bashTool.execute(id, params, signal, onUpdate, ctx);
     },
   });
 
@@ -355,7 +355,7 @@ export default function (pi: ExtensionAPI) {
         };
       }
 
-      return psTool.execute(id, params, signal, onUpdate);
+      return psTool.execute(id, params, signal, onUpdate, ctx);
     },
   });
 

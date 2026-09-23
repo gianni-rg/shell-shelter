@@ -15,7 +15,7 @@
  */
 
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { createBashTool, createPowerShellTool } from "@earendil-works/pi-coding-agent";
+import { createBashToolDefinition, createPowerShellToolDefinition } from "@earendil-works/pi-coding-agent";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -318,7 +318,9 @@ export default function (pi: ExtensionAPI) {
   // -----------------------------------------------------------------------
   // Wrap bash tool
   // -----------------------------------------------------------------------
-  const bashTool = createBashTool(repoRoot);
+  // Use the *Definition factory: its execute accepts ExtensionContext as a 5th argument,
+  // unlike the AgentTool.execute contract returned by createBashTool.
+  const bashTool = createBashToolDefinition(repoRoot);
 
   pi.registerTool({
     ...bashTool,
@@ -340,7 +342,9 @@ export default function (pi: ExtensionAPI) {
   // -----------------------------------------------------------------------
   // Wrap PowerShell tool
   // -----------------------------------------------------------------------
-  const psTool = createPowerShellTool(repoRoot);
+  // Use the *Definition factory: its execute accepts ExtensionContext as a 5th argument,
+  // unlike the AgentTool.execute contract returned by createPowerShellTool.
+  const psTool = createPowerShellToolDefinition(repoRoot);
 
   pi.registerTool({
     ...psTool,

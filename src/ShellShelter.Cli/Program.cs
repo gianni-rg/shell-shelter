@@ -157,21 +157,17 @@ static string? ResolveConfigPath(string? customConfig)
 
 static ShellPolicy LoadBashPolicy(ConfigLoader loader, string? configPath)
 {
-    if (configPath != null && File.Exists(configPath))
-    {
-        try { return loader.Load(configPath).BashPolicy; }
-        catch { /* fall through to defaults */ }
-    }
+    if (configPath != null)
+        return loader.Load(configPath).BashPolicy;
+
     return loader.LoadFromText(DefaultConfigs.BashDefaultIni).BashPolicy;
 }
 
 static ShellPolicy LoadPsPolicy(ConfigLoader loader, string? configPath)
 {
-    if (configPath != null && File.Exists(configPath))
-    {
-        try { return loader.Load(configPath).PsPolicy; }
-        catch { /* fall through to defaults */ }
-    }
+    if (configPath != null)
+        return loader.Load(configPath).PsPolicy;
+
     return loader.LoadFromText(DefaultConfigs.BashDefaultIni + "\n" + DefaultConfigs.PsDefaultIni).PsPolicy;
 }
 

@@ -210,16 +210,7 @@ public static class PsTools
     {
         string configPath = ConfigLoader.GetDefaultConfigPath();
         if (File.Exists(configPath))
-        {
-            try
-            {
-                return _configLoader.Load(configPath).PsPolicy;
-            }
-            catch
-            {
-                // Fall back to built-in defaults if config is malformed
-            }
-        }
+            return _configLoader.Load(configPath).PsPolicy;
 
         return _configLoader.LoadFromText(DefaultConfigs.BashDefaultIni + "\n" + DefaultConfigs.PsDefaultIni).PsPolicy;
     }

@@ -311,16 +311,7 @@ public static class BashTools
     {
         string configPath = ConfigLoader.GetDefaultConfigPath();
         if (File.Exists(configPath))
-        {
-            try
-            {
-                return _configLoader.Load(configPath).BashPolicy;
-            }
-            catch
-            {
-                // Fall back to built-in defaults if the config is malformed
-            }
-        }
+            return _configLoader.Load(configPath).BashPolicy;
 
         return _configLoader.LoadFromText(DefaultConfigs.BashDefaultIni).BashPolicy;
     }

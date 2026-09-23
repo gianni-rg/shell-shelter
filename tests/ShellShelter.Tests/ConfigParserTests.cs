@@ -126,6 +126,36 @@ public sealed class ConfigParserTests
     }
 
     [Fact]
+    public void Load_MissingFile_ThrowsInsteadOfUsingDefaults()
+    {
+        ConfigLoader loader = new();
+        string path = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.json");
+
+        Should.Throw<FileNotFoundException>(() => loader.Load(path));
+    }
+
+    [Fact]
+    public void Load_MalformedFile_ThrowsInsteadOfUsingDefaults()
+    {
+        string path = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.json");
+
+        try
+        {
+            File.WriteAllText(path, "{");
+            ConfigLoader loader = new();
+
+            Should.Throw<JsonException>(() => loader.Load(path));
+        }
+        finally
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+    }
+
+    [Fact]
     public void LoadFromText_DefaultIni_LoadsAuthoritativePythonDefaults()
     {
         ConfigLoader loader = new();

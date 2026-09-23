@@ -1,9 +1,19 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>shellshelter</ToolCommandName>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>shellshelter</AssemblyName>
+    <PackageId>ShellShelter.Cli</PackageId>
+    <Authors>Gianni Rosa Gallina</Authors>
+    <Description>CLI tool for validating and safely running shell commands against a customizable allowlist.</Description>
+    <PackageProjectUrl>https://github.com/gianni-rg/shell-shelter</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/gianni-rg/shell-shelter</RepositoryUrl>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+    <PackageTags>shell;security;allowlist;powershell;bash</PackageTags>
+    <ToolClass>ShellShelter.Cli.Program</ToolClass>
+  </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\ShellShelter.Core\ShellShelter.Core.csproj" />
   </ItemGroup>
-  <PropertyGroup>
-    <OutputType>Exe</OutputType>
-    <AssemblyName>shellshelter</AssemblyName>
-  </PropertyGroup>
 </Project>

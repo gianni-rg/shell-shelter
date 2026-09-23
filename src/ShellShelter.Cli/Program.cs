@@ -118,7 +118,7 @@ try
             return 1;
 
         case "config" when (argsStart + 1 < args.Length && args[argsStart + 1].Equals("path", StringComparison.OrdinalIgnoreCase)):
-            Console.WriteLine(ConfigLoader.GetDefaultConfigPath());
+            Console.WriteLine(resolvedConfig ?? ConfigLoader.GetDefaultConfigPath());
             return 0;
 
         case "config":
@@ -236,8 +236,8 @@ static void PrintUsage()
           bash <cmd>                   Run <cmd> in bash against the allowlist
           pwsh <cmd>                   Run <cmd> in pwsh against the allowlist
           validate bash|pwsh <cmd>     Validate <cmd> against the allowlist without executing it
-          config path                  Print the active (global) config file path
-          export json|ini              Print the default allowlist config as JSON or INI
+          config path                  Print the active config file path (respects --config)
+          export json|ini              Print the built-in default allowlist as JSON or INI
 
         Examples:
           shellshelter bash "echo hello"

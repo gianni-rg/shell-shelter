@@ -194,7 +194,7 @@ See detailed docs:
 
 The [`.pi/extensions/`](.pi/extensions/) folder ships a [pi coding agent](https://github.com/badlogic/pi-mono) extension that gates every `bash`/`PowerShell` tool call pi makes through the ShellShelter allowlist engine. Blocked commands prompt you to block, execute once, allow for the session, or permanently add them to `.shellshelter`.
 
-Requires the `shellshelter` CLI installed globally (see [Installation as .NET Global Tool](#installation-as-net-global-tool)). To use it in your own project, copy `.pi/extensions/shell-shelter-gate.ts` into your project's `.pi/extensions/` folder or in the `.pi/extensions/` folder of your home directory to be used in any project.
+Requires the `shellshelter` CLI installed globally (see [Installation as .NET Global Tool](#installation-as-net-global-tool)). To use it in your own project, copy `.pi/extensions/shell-shelter-gate.ts` into your project's `.pi/extensions/` folder or in the `.pi/agent/extensions/` folder of your home directory to be used in any project.
 
 See [.pi/extensions/README.md](.pi/extensions/README.md) for installation options, configuration, and debugging.
 

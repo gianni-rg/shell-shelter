@@ -48,7 +48,7 @@ pi --extension path/to/shell-shelter-gate.ts
 Copy to the global extensions folder:
 
 ```bash
-cp shell-shelter-gate.ts ~/.pi/extensions/
+cp shell-shelter-gate.ts ~/.pi/agent/extensions/
 ```
 
 ## Configuration

@@ -74,8 +74,23 @@ function saveConfig(config: ShellShelterConfig): void {
   fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n");
 }
 
+/**
+ * `CmdSpec.FromStr` splits on `:` to parse `denied`/`exec=`/`dest=` metadata, so a raw command
+ * containing a colon (e.g. PowerShell `-FilePath:C:\foo`) would be silently reinterpreted —
+ * potentially narrowing the allowed name prefix or turning part of the command into a denied
+ * flag. There is no escaping for this in the CmdSpec serialization, so such commands cannot be
+ * safely auto-added and must be authored manually.
+ */
+function isSafeToAutoAdd(cmd: string): boolean {
+  return !cmd.includes(":");
+}
+
 /** Returns false (and leaves the file untouched) when the config is INI-formatted, unparsable, or unavailable. */
 function addCommandToConfig(key: "bash" | "powershell", cmdSpec: string): boolean {
+  if (!isSafeToAutoAdd(cmdSpec)) {
+    return false;
+  }
+
   if (!configPath || (fs.existsSync(configPath) && !isJsonConfigFile(configPath))) {
     return false;
   }
@@ -216,13 +231,20 @@ async function gateCommand(
     case "add_to_allowlist": {
       // Persist the exact command, not just its prefix — CmdSpec treats the name as an
       // allowlisted prefix, so a truncated prefix (e.g. "rm -rf") would permit arbitrary
-      // trailing arguments/destinations on every future invocation.
+      // trailing arguments/destinations on every future invocation. Commands containing ':'
+      // are rejected by addCommandToConfig — see isSafeToAutoAdd.
       const added = addCommandToConfig(shell, cmd);
       if (added) {
-        ctx.ui?.notify(`Added to .shellshelter: ${cmd}`, "info");
+        ctx.ui?.notify(
+          `Added to .shellshelter: ${cmd}\n` +
+          `Note: this still allows any additional trailing arguments after this exact prefix.`,
+          "info"
+        );
       } else {
         ctx.ui?.notify(
-          `Cannot auto-add: ${configPath ?? ".shellshelter"} could not be safely updated (non-JSON or unparsable). Edit it manually to add "${cmd}".`,
+          `Cannot auto-add "${cmd}": either it contains ':' (which ShellShelter's CmdSpec format ` +
+          `reserves for exec=/dest=/denied-flag metadata) or ${configPath ?? ".shellshelter"} could ` +
+          `not be safely updated (non-JSON or unparsable). Edit the config manually to add it.`,
           "warning"
         );
         // The command was never persisted — fail closed rather than silently executing it.

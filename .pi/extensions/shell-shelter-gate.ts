@@ -14,7 +14,7 @@
  *   Or load directly: pi --extension .pi/extensions/shell-shelter-gate.ts
  */
 
-import type { ExtensionAPI, ExtensionUIContext } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { createBashTool, createPowerShellTool } from "@earendil-works/pi-coding-agent";
 import * as fs from "fs";
 import * as path from "path";
@@ -49,8 +49,19 @@ interface ShellShelterConfig {
   powershell?: { okDests?: string[]; okCmds?: string[] };
 }
 
+/** ShellShelter also supports INI-format `.shellshelter` files, which this extension cannot safely rewrite. */
+function isJsonConfigFile(filePath: string): boolean {
+  if (filePath.toLowerCase().endsWith(".json")) return true;
+  if (!fs.existsSync(filePath)) return true;
+  try {
+    return fs.readFileSync(filePath, "utf-8").trim().startsWith("{");
+  } catch {
+    return true;
+  }
+}
+
 function loadConfig(): ShellShelterConfig | null {
-  if (!configPath || !fs.existsSync(configPath)) return null;
+  if (!configPath || !fs.existsSync(configPath) || !isJsonConfigFile(configPath)) return null;
   try {
     return JSON.parse(fs.readFileSync(configPath, "utf-8")) as ShellShelterConfig;
   } catch {
@@ -63,7 +74,12 @@ function saveConfig(config: ShellShelterConfig): void {
   fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n");
 }
 
-function addCommandToConfig(key: "bash" | "powershell", cmdSpec: string): void {
+/** Returns false (and leaves the file untouched) when the config is INI-formatted or unavailable. */
+function addCommandToConfig(key: "bash" | "powershell", cmdSpec: string): boolean {
+  if (!configPath || (fs.existsSync(configPath) && !isJsonConfigFile(configPath))) {
+    return false;
+  }
+
   const config = loadConfig() ?? { bash: { okDests: [], okCmds: [] }, powershell: { okDests: [], okCmds: [] } };
   if (!config[key]) config[key] = { okDests: [], okCmds: [] };
   if (!config[key].okCmds) config[key].okCmds = [];
@@ -72,6 +88,7 @@ function addCommandToConfig(key: "bash" | "powershell", cmdSpec: string): void {
     config[key].okCmds!.push(cmdSpec);
     saveConfig(config);
   }
+  return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -104,21 +121,21 @@ async function shellShelterCheck(
   shell: "bash" | "powershell",
   configPath: string
 ): Promise<ExecResult> {
-  const { exec } = await import("node:child_process");
+  const { execFile } = await import("node:child_process");
   const { promisify } = await import("node:util");
-  const execAsync = promisify(exec);
+  const execFileAsync = promisify(execFile);
+
+  // Args passed as an array (no shell) so command text can never be reinterpreted as shell syntax.
+  const args = ["--config", configPath, "validate", cliShell(shell), cmd];
 
   try {
-    const { stdout, stderr } = await execAsync(
-      `shellshelter --config "${configPath}" validate ${cliShell(shell)} "${cmd.replace(/"/g, '\\"')}"`,
-      { timeout: 10000 }
-    );
+    const { stdout } = await execFileAsync("shellshelter", args, { timeout: 10000 });
     return { ok: true, stdout, stderr: "", code: 0 };
   } catch (err: any) {
-    const code = err.code ?? err.exitCode ?? 1;
+    const code = typeof err.code === "number" ? err.code : (err.exitCode ?? 1);
     const stderr = err.stderr ?? err.message ?? "";
-    // Exit code 2 = command denied by allowlist
-    return { ok: code !== 2, stdout: "", stderr, code };
+    // Only a clean exit 0 counts as allowed; denials (2), missing tools, timeouts, etc. all fail closed.
+    return { ok: false, stdout: "", stderr, code };
   }
 }
 
@@ -131,9 +148,9 @@ type GateChoice = "block" | "allow_once" | "allow_session" | "add_to_allowlist";
 async function promptGateChoice(
   cmd: string,
   shell: "bash" | "powershell",
-  ctx: ExtensionUIContext
+  ctx: ExtensionContext
 ): Promise<GateChoice> {
-  if (!ctx.hasUI) return "allow_once"; // Fail open when no UI
+  if (!ctx.hasUI || !ctx.ui) return "block"; // Fail closed when no UI to prompt
 
   const cmdShort = cmd.length > 80 ? cmd.slice(0, 80) + "…" : cmd;
   const choice = await ctx.ui.select(
@@ -161,32 +178,39 @@ async function promptGateChoice(
 async function gateCommand(
   cmd: string,
   shell: "bash" | "powershell",
-  ctx: ExtensionUIContext
+  ctx: ExtensionContext
 ): Promise<{ blocked: boolean; reason: string }> {
   // Session allowlist check (highest priority — per-session, no CLI overhead)
   if (isSessionAllowed(cmd, shell)) {
     return { blocked: false, reason: "" };
   }
 
-  // All commands go through CLI for full AST / CmdSpec-aware validation
-  const configPathForCli = configPath ?? process.cwd();
+  // Auto-discover from repo root when no project config was resolved yet — never skip validation.
+  const configPathForCli = configPath ?? ".";
   const result = await shellShelterCheck(cmd, shell, configPathForCli);
 
   if (result.ok) {
     return { blocked: false, reason: "" };
   }
 
-  // Command denied — prompt user
+  // Denied by policy, or the CLI check failed to run — prompt user (fails closed without UI)
   const choice = await promptGateChoice(cmd, shell, ctx);
   switch (choice) {
     case "allow_session": {
       addSessionAllow(cmd, shell);
-      ctx.ui.notify(`Allowed "${extractCommandPrefix(cmd)}" for this session`, "success");
+      ctx.ui?.notify(`Allowed "${extractCommandPrefix(cmd)}" for this session`, "info");
       break;
     }
     case "add_to_allowlist": {
-      addCommandToConfig(shell, extractCommandPrefix(cmd));
-      ctx.ui.notify(`Added to .shellshelter: ${extractCommandPrefix(cmd)}`, "success");
+      const added = addCommandToConfig(shell, extractCommandPrefix(cmd));
+      if (added) {
+        ctx.ui?.notify(`Added to .shellshelter: ${extractCommandPrefix(cmd)}`, "info");
+      } else {
+        ctx.ui?.notify(
+          `Cannot auto-add: ${configPath ?? ".shellshelter"} is not JSON. Edit it manually to add "${extractCommandPrefix(cmd)}".`,
+          "warning"
+        );
+      }
       break;
     }
     case "allow_once":
@@ -222,10 +246,10 @@ export default function (pi: ExtensionAPI) {
         const stdout = execSync("shellshelter export json").toString();
         configPath = path.join(repoRoot, CONFIG_FILENAME);
         fs.writeFileSync(configPath, stdout);
-        ctx.ui.notify(`Created .shellshelter with default allowlist`, "success");
+        ctx.ui?.notify(`Created .shellshelter with default allowlist`, "info");
       } catch {
-        ctx.ui.notify(
-          "ShellShelter CLI not available — gating disabled. " +
+        ctx.ui?.notify(
+          "ShellShelter CLI not available — commands will be blocked until it is installed. " +
           "Install it with: dotnet tool install --global ShellShelter.Cli",
           "warning"
         );
@@ -241,10 +265,7 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool({
     ...bashTool,
     execute: async (id, params, signal, onUpdate, ctx) => {
-      if (!configPath) {
-        return bashTool.execute(id, params, signal, onUpdate);
-      }
-
+      // No bypass: gateCommand always validates, auto-discovering/falling back to the global config.
       const cmd = params.command;
       const gate = await gateCommand(cmd, "bash", ctx);
       if (gate.blocked) {
@@ -266,10 +287,7 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool({
     ...psTool,
     execute: async (id, params, signal, onUpdate, ctx) => {
-      if (!configPath) {
-        return psTool.execute(id, params, signal, onUpdate);
-      }
-
+      // No bypass: gateCommand always validates, auto-discovering/falling back to the global config.
       const cmd = params.command;
       const gate = await gateCommand(cmd, "powershell", ctx);
       if (gate.blocked) {
@@ -291,13 +309,13 @@ export default function (pi: ExtensionAPI) {
     handler: async (_args, ctx) => {
       const config = loadConfig();
       if (!configPath) {
-        ctx.ui.notify("No .shellshelter config found", "info");
+        ctx.ui?.notify("No .shellshelter config found — validation falls back to the global config", "info");
         return;
       }
-      const bashCount = config.bash?.okCmds?.length ?? 0;
-      const psCount = config.powershell?.okCmds?.length ?? 0;
+      const bashCount = config?.bash?.okCmds?.length ?? 0;
+      const psCount = config?.powershell?.okCmds?.length ?? 0;
       const sessionCount = sessionAllowlist.size;
-      ctx.ui.notify(
+      ctx.ui?.notify(
         `ShellShelter gate active\nConfig: ${configPath}\nBash: ${bashCount} commands\nPowerShell: ${psCount} commands\nSession allowlist: ${sessionCount} commands`,
         "info"
       );

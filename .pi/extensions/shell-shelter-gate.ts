@@ -225,6 +225,8 @@ async function gateCommand(
           `Cannot auto-add: ${configPath ?? ".shellshelter"} could not be safely updated (non-JSON or unparsable). Edit it manually to add "${cmd}".`,
           "warning"
         );
+        // The command was never persisted — fail closed rather than silently executing it.
+        return { blocked: true, reason: "Could not add command to allowlist" };
       }
       break;
     }

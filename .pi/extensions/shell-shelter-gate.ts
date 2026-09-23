@@ -260,10 +260,17 @@ export default function (pi: ExtensionAPI) {
     if (!configPath) {
       try {
         const { execSync } = await import("node:child_process");
-        const stdout = execSync("shellshelter export json").toString();
-        configPath = path.join(repoRoot, CONFIG_FILENAME);
-        fs.writeFileSync(configPath, stdout);
-        ctx.ui?.notify(`Created .shellshelter with default allowlist`, "info");
+        const globalConfigPath = execSync("shellshelter config path").toString().trim();
+        if (fs.existsSync(globalConfigPath)) {
+          // A global config already exists — don't shadow the user's restrictions with a
+          // fresh project-local default; let validation fall back to the global config.
+          ctx.ui?.notify(`Using existing global ShellShelter config: ${globalConfigPath}`, "info");
+        } else {
+          const stdout = execSync("shellshelter export json").toString();
+          configPath = path.join(repoRoot, CONFIG_FILENAME);
+          fs.writeFileSync(configPath, stdout);
+          ctx.ui?.notify(`Created .shellshelter with default allowlist`, "info");
+        }
       } catch {
         ctx.ui?.notify(
           "ShellShelter CLI not available — commands will be blocked until it is installed. " +

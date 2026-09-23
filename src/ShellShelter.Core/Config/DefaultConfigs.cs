@@ -19,18 +19,6 @@ public static class DefaultConfigs
             "/dev/null",
             "/tmp",
         ];
-    private static readonly string[] BashDefaultOkDests = OperatingSystem.IsWindows()
-        ? [
-            "./",
-            "/dev/null",
-            "%TEMP%",
-            "C:\\Temp",
-        ]
-        : [
-            "./",
-            "/dev/null",
-            "/tmp",
-        ];
 
     private static readonly string[] BashDefaultOkCmds =
     [

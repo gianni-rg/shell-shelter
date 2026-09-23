@@ -132,7 +132,7 @@ try
                 string output = format switch
                 {
                     "json" => DefaultConfigs.BashDefaultJson,
-                    "ini" => DefaultConfigs.BashDefaultIni + Environment.NewLine + DefaultConfigs.PsDefaultIni,
+                    "ini" => DefaultConfigs.BashDefaultIni + Environment.NewLine + DefaultConfigs.PsDefaultIniPlatform,
                     _ => throw new ArgumentException($"Unknown export format: {format}")
                 };
                 Console.Write(output);
@@ -220,7 +220,7 @@ static ShellPolicy LoadPsPolicy(ConfigLoader loader, string? configPath)
         return loader.Load(configPath).PsPolicy;
 
     string globalConfigPath = ConfigLoader.GetDefaultConfigPath();
-    return loader.LoadOrDefault(globalConfigPath, DefaultConfigs.BashDefaultIni + "\n" + DefaultConfigs.PsDefaultIni).PsPolicy;
+    return loader.LoadOrDefault(globalConfigPath, DefaultConfigs.BashDefaultIni + "\n" + DefaultConfigs.PsDefaultIniPlatform).PsPolicy;
 }
 
 static void PrintUsage()

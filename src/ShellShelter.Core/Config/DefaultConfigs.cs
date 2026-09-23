@@ -433,11 +433,15 @@ public static class DefaultConfigs
     /// <summary>
     /// Gets the built-in PowerShell default INI configuration section.
     /// </summary>
-    public static string PsDefaultIni =>
-        (OperatingSystem.IsWindows()
-            ? "[POWERSHELL]\nok_dests = .\\, $env:TEMP\n\n"
-            : "[POWERSHELL]\nok_dests = .\\, $env:TEMP, /tmp\n\n") +
-        """
+    /// <remarks>
+    /// Preserved as a compile-time constant for source/binary compatibility with existing
+    /// consumers (e.g. usage in <c>const</c>/attribute contexts). Use
+    /// <see cref="PsDefaultIniPlatform"/> for the platform-aware destination list.
+    /// </remarks>
+    public const string PsDefaultIni = """
+        [POWERSHELL]
+        ok_dests = .\, $env:TEMP
+
         ok_cmds = Get-ChildItem, Get-Location, Set-Location, Push-Location, Pop-Location
             Get-Content, Select-Object, Where-Object, ForEach-Object, Sort-Object
             Group-Object, Measure-Object, Compare-Object, Select-String, Get-Unique
@@ -464,4 +468,14 @@ public static class DefaultConfigs
             shellshelter
             Tee-Object:dest=-FilePath|-LiteralPath
         """;
+
+    /// <summary>
+    /// Gets the platform-aware PowerShell default INI configuration section, including
+    /// <c>/tmp</c> in <c>ok_dests</c> on non-Windows platforms.
+    /// </summary>
+    public static string PsDefaultIniPlatform =>
+        (OperatingSystem.IsWindows()
+            ? "[POWERSHELL]\nok_dests = .\\, $env:TEMP\n\n"
+            : "[POWERSHELL]\nok_dests = .\\, $env:TEMP, /tmp\n\n") +
+        PsDefaultIni[(PsDefaultIni.IndexOf("ok_cmds", StringComparison.Ordinal))..];
 }

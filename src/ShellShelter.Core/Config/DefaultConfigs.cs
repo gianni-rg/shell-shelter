@@ -319,30 +319,8 @@ public static class DefaultConfigs
             cd, pwd, export, test, [, true, false
         """;
 
-    /// <summary>
-    /// Gets the built-in bash defaults encoded in the native JSON configuration format.
-    /// </summary>
-    public static string BashDefaultJson { get; } = JsonSerializer.Serialize(
-        new
-        {
-            bash = new
-            {
-                okDests = BashDefaultOkDests,
-                okCmds = BashDefaultOkCmds,
-            },
-            powershell = new
-            {
-                okDests = PsDefaultOkDests,
-                okCmds = PsDefaultOkCmds,
-            },
-        },
-        new JsonSerializerOptions
-        {
-            WriteIndented = true,
-        });
-
     // ---------------------------------------------------------------------------
-    // PowerShell defaults
+    // PowerShell defaults (defined before BashDefaultJson so it can reference them)
     // ---------------------------------------------------------------------------
 
     private static readonly string[] PsDefaultOkDests =
@@ -393,6 +371,28 @@ public static class DefaultConfigs
         // Tee (write dest validated)
         "Tee-Object:dest=-FilePath|-LiteralPath",
     ];
+
+    /// <summary>
+    /// Gets the built-in bash defaults encoded in the native JSON configuration format.
+    /// </summary>
+    public static string BashDefaultJson { get; } = JsonSerializer.Serialize(
+        new
+        {
+            bash = new
+            {
+                okDests = BashDefaultOkDests,
+                okCmds = BashDefaultOkCmds,
+            },
+            powershell = new
+            {
+                okDests = PsDefaultOkDests,
+                okCmds = PsDefaultOkCmds,
+            },
+        },
+        new JsonSerializerOptions
+        {
+            WriteIndented = true,
+        });
 
     /// <summary>
     /// Gets the built-in PowerShell default INI configuration section.

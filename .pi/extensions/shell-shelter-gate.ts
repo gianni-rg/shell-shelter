@@ -40,8 +40,20 @@ function addSessionAllow(cmd: string, shell: "bash" | "powershell"): void {
 }
 
 function resolveConfigPath(repoRoot: string): string | undefined {
-  const candidate = path.join(repoRoot, CONFIG_FILENAME);
-  return fs.existsSync(candidate) ? candidate : undefined;
+  // Mirror the CLI's `--config .` auto-discovery (Program.cs ResolveConfigPath): search these
+  // filenames, walking up parent directories, before falling back to creating a new config.
+  const candidates = ["shellshelter.json", "shellshelter.config.json", CONFIG_FILENAME];
+  let dir: string | undefined = repoRoot;
+  while (dir) {
+    for (const candidateName of candidates) {
+      const candidate = path.join(dir, candidateName);
+      if (fs.existsSync(candidate)) return candidate;
+    }
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return undefined;
 }
 
 interface ShellShelterConfig {

@@ -152,7 +152,13 @@ public sealed class ConfigParserTests
         result.BashPolicy.OkDests.OrderBy(static dest => dest, StringComparer.Ordinal).ShouldBe(["./", "/dev/null", "/tmp"]);
         result.BashPolicy.OkCmds.ShouldContain(new CmdSpec("tar"));
         result.BashPolicy.OkCmds.ShouldContain(new CmdSpec("["));
-        result.PsPolicy.OkCmds.ShouldBeEmpty();
-        result.PsPolicy.OkDests.ShouldBeEmpty();
+        // PowerShell defaults should be loaded from BashDefaultJson
+        result.PsPolicy.OkDests.ShouldContain(".\\");
+        result.PsPolicy.OkDests.ShouldContain("$env:TEMP");
+        result.PsPolicy.OkDests.ShouldContain("/tmp");
+        result.PsPolicy.OkCmds.ShouldContain(new CmdSpec("Get-ChildItem"));
+        result.PsPolicy.OkCmds.ShouldContain(new CmdSpec("Get-Content"));
+        result.PsPolicy.OkCmds.ShouldContain(new CmdSpec("git log"));
+        result.PsPolicy.OkCmds.ShouldContain(new CmdSpec("dotnet build"));
     }
 }

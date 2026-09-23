@@ -46,6 +46,54 @@ dotnet run --project src/ShellShelter.Cli -- pwsh "Get-ChildItem"
 dotnet run --project src/ShellShelter.Cli -- config path
 ```
 
+Or with the global tool installed:
+
+```bash
+shellshelter bash "echo hello"
+shellshelter pwsh "Get-ChildItem"
+shellshelter config path
+```
+
+#### Custom Config
+
+Use `--config` (or `-c`) to specify a project-specific allowlist:
+
+```bash
+# Explicit path
+shellshelter --config ./shellshelter.config.json bash "echo hello"
+
+# Auto-discover: searches cwd and parent directories for shellshelter.json
+shellshelter -c . pwsh "Get-ChildItem"
+
+# No flag = uses the global config (default behavior)
+shellshelter bash "echo hello"
+```
+
+When using `--config .`, ShellShelter searches the current directory and walks up the directory tree looking for:
+
+1. `shellshelter.json`
+2. `shellshelter.config.json`
+3. `.shellshelter`
+
+If not found, it falls back to the global config at `~/.config/shellshelter/config.json` (Linux/macOS) or `%APPDATA%\ShellShelter\config.json` (Windows).
+
+#### Export Default Config
+
+Use `export` to print the built-in default allowlist as JSON or INI — a starting point for custom project configs:
+
+```bash
+# Print default config as JSON
+shellshelter export json
+
+# Print default config as INI (bash + powershell)
+shellshelter export ini
+
+# Create a custom config from defaults, then edit it
+shellshelter export json > shellshelter.json
+# edit shellshelter.json to remove commands you don't need
+shellshelter --config ./shellshelter.json bash "echo hello"
+```
+
 ### C# API
 
 ```csharp

@@ -19,6 +19,18 @@ public static class DefaultConfigs
             "/dev/null",
             "/tmp",
         ];
+    private static readonly string[] BashDefaultOkDests = OperatingSystem.IsWindows()
+        ? [
+            "./",
+            "/dev/null",
+            "%TEMP%",
+            "C:\\Temp",
+        ]
+        : [
+            "./",
+            "/dev/null",
+            "/tmp",
+        ];
 
     private static readonly string[] BashDefaultOkCmds =
     [
@@ -350,7 +362,7 @@ public static class DefaultConfigs
             + "\n    # Builtins\n    cd, pwd, export, test, [, true, false";
 
     // ---------------------------------------------------------------------------
-    // PowerShell defaults
+    // PowerShell defaults (defined before BashDefaultJson so it can reference them)
     // ---------------------------------------------------------------------------
 
     private static readonly string[] PsDefaultOkDests = OperatingSystem.IsWindows()

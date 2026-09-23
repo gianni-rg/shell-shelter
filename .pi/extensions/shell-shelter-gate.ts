@@ -110,7 +110,7 @@ async function shellShelterCheck(
 
   try {
     const { stdout, stderr } = await execAsync(
-      `shellshelter --config "${configPath}" ${cliShell(shell)} "${cmd.replace(/"/g, '\\"')}"`,
+      `shellshelter --config "${configPath}" validate ${cliShell(shell)} "${cmd.replace(/"/g, '\\"')}"`,
       { timeout: 10000 }
     );
     return { ok: true, stdout, stderr: "", code: 0 };

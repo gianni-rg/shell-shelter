@@ -77,6 +77,7 @@ dotnet tool uninstall --global ShellShelter.Cli
 ```bash
 dotnet run --project src/ShellShelter.Cli -- bash "echo hello"
 dotnet run --project src/ShellShelter.Cli -- pwsh "Get-ChildItem"
+dotnet run --project src/ShellShelter.Cli -- validate bash "echo hello"
 dotnet run --project src/ShellShelter.Cli -- config path
 ```
 
@@ -85,8 +86,21 @@ Or with the global tool installed:
 ```bash
 shellshelter bash "echo hello"
 shellshelter pwsh "Get-ChildItem"
+shellshelter validate bash "echo hello"
 shellshelter config path
 ```
+
+#### Validate Without Executing
+
+Use `validate <bash|pwsh> <cmd>` to check a command against the allowlist without running it — useful for gating tool calls (e.g. in editor/agent integrations) before deciding whether to execute:
+
+```bash
+shellshelter validate bash "echo hello"     # exit 0: allowed
+shellshelter validate bash "rm -rf /"       # exit 2: denied, nothing executed
+shellshelter validate pwsh "Get-ChildItem"
+```
+
+Exit codes match the executing subcommands: `0` allowed, `2` denied, `3` if `shfmt`/`pwsh` is missing.
 
 #### Custom Config
 
